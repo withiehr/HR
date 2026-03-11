@@ -12,7 +12,7 @@ export interface User {
 // ===== 직원 관련 타입 =====
 export type EmploymentStatus = '재직' | '휴직' | '퇴사';
 export type EmploymentType = '정규직' | '계약직' | '인턴' | '파견직' | '일용직';
-export type Position = 'Entry B' | 'Entry A' | 'Junior' | 'Senior';
+export type Position = 'CEO' | 'PD' | 'Entry B' | 'Entry A' | 'Junior' | 'Senior';
 
 export interface Employee {
   id: string;

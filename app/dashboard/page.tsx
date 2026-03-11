@@ -1,14 +1,39 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Users, Clock, UserCheck, UserMinus, FileUp, AlertTriangle } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import Badge from '@/components/ui/Badge';
-import { employees } from '@/data/employees';
-import { personnelHistories } from '@/data/personnel-history';
-import { documents } from '@/data/documents';
 import { formatDate, getDaysUntil } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import { rowToEmployee, rowToPersonnelHistory, rowToDocument } from '@/lib/supabase-utils';
+import type { Employee, PersonnelHistory, Document } from '@/types';
 
 export default function DashboardPage() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [histories, setHistories] = useState<PersonnelHistory[]>([]);
+  const [docs, setDocs] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      const [empRes, histRes, docRes] = await Promise.all([
+        supabase.from('employees').select('*').order('employee_number'),
+        supabase.from('personnel_histories').select('*, employees(name)').order('effective_date', { ascending: false }).limit(5),
+        supabase.from('documents').select('*, employees(name, department)').order('uploaded_at', { ascending: false }).limit(5),
+      ]);
+      if (empRes.data) setEmployees(empRes.data.map(rowToEmployee));
+      if (histRes.data) setHistories(histRes.data.map(rowToPersonnelHistory));
+      if (docRes.data) setDocs(docRes.data.map(rowToDocument));
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64 text-gray-400">로딩 중...</div>;
+  }
+
   const activeEmployees = employees.filter((e) => e.status === '재직');
   const onLeave = employees.filter((e) => e.status === '휴직');
   const resigned = employees.filter((e) => e.status === '퇴사');
@@ -32,16 +57,6 @@ export default function DashboardPage() {
     const days = getDaysUntil(e.leaveEndDate);
     return days >= 0;
   }).sort((a, b) => getDaysUntil(a.leaveEndDate!) - getDaysUntil(b.leaveEndDate!));
-
-  // 최근 인사 변동
-  const recentHistory = [...personnelHistories]
-    .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
-    .slice(0, 5);
-
-  // 최근 문서 업로드
-  const recentDocs = [...documents]
-    .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-    .slice(0, 5);
 
   const historyBadgeVariant = (type: string) => {
     const map: Record<string, 'success' | 'danger' | 'info' | 'warning' | 'default' | 'secondary'> = {
@@ -168,32 +183,40 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">최근 인사 변동</h3>
-          <div className="space-y-0">
-            {recentHistory.map((h) => (
-              <div key={h.id} className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
-                <div className="mt-0.5"><Badge variant={historyBadgeVariant(h.type)}>{h.type}</Badge></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800">{h.employeeName} - {h.details}</p>
-                  <p className="text-xs text-gray-400">{formatDate(h.effectiveDate)}</p>
+          {histories.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">인사 변동 이력이 없습니다</p>
+          ) : (
+            <div className="space-y-0">
+              {histories.map((h) => (
+                <div key={h.id} className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
+                  <div className="mt-0.5"><Badge variant={historyBadgeVariant(h.type)}>{h.type}</Badge></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800">{h.employeeName} - {h.details}</p>
+                    <p className="text-xs text-gray-400">{formatDate(h.effectiveDate)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">최근 문서 업로드</h3>
-          <div className="space-y-0">
-            {recentDocs.map((doc) => (
-              <div key={doc.id} className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
-                <div className="mt-0.5"><FileUp size={16} className="text-gray-400" /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
-                  <p className="text-xs text-gray-400">{doc.employeeName} · {doc.documentType} · {formatDate(doc.uploadedAt)}</p>
+          {docs.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">업로드된 문서가 없습니다</p>
+          ) : (
+            <div className="space-y-0">
+              {docs.map((doc) => (
+                <div key={doc.id} className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-0">
+                  <div className="mt-0.5"><FileUp size={16} className="text-gray-400" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate">{doc.fileName}</p>
+                    <p className="text-xs text-gray-400">{doc.employeeName} · {doc.documentType} · {formatDate(doc.uploadedAt)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
