@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Building2, FileText, Award, History, UserMinus, ClipboardList, Camera, Briefcase, Plus, X, Edit2, Trash2, CalendarDays, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Building2, FileText, Award, History, UserMinus, ClipboardList, Camera, Briefcase, Plus, X, Edit2, Trash2, CalendarDays, Download, Upload, FileDown } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Image from 'next/image';
@@ -324,6 +324,43 @@ export default function EmployeeDetailPage() {
     setUploading(false);
   };
 
+  const handlePdfDownload = async () => {
+    const { default: html2canvas } = await import('html2canvas-pro');
+    const { default: jsPDF } = await import('jspdf');
+
+    const content = document.getElementById('employee-detail-content');
+    if (!content) return;
+
+    // 숨길 요소 (버튼 등)
+    const buttons = content.querySelectorAll('button, input[type=file]');
+    buttons.forEach((el) => (el as HTMLElement).style.visibility = 'hidden');
+
+    const canvas = await html2canvas(content, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f9fafb',
+    });
+
+    buttons.forEach((el) => (el as HTMLElement).style.visibility = '');
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    let position = 0;
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // 여러 페이지 지원
+    while (position < pdfHeight) {
+      if (position > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, -position, pdfWidth, pdfHeight);
+      position += pageHeight;
+    }
+
+    pdf.save(`${employee.name}_직원상세.pdf`);
+  };
+
   const openCareerModal = (career?: CareerHistory) => {
     if (career) {
       setEditingCareer(career);
@@ -589,7 +626,7 @@ export default function EmployeeDetailPage() {
   })();
 
   return (
-    <div className="space-y-6">
+    <div id="employee-detail-content" className="space-y-6">
       {/* 상단 헤더 */}
       <div className="flex items-center gap-4">
         <button onClick={() => router.push('/employees')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -634,6 +671,14 @@ export default function EmployeeDetailPage() {
         <Badge variant={statusBadgeVariant(employee.status)} className="ml-2">{employee.status}</Badge>
         {employee.isProbation && <Badge variant="warning">수습</Badge>}
         {uploading && <span className="text-xs text-gray-400 ml-2">업로드 중...</span>}
+        <div className="ml-auto">
+          <button
+            onClick={handlePdfDownload}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FileDown size={14} /> PDF 다운로드
+          </button>
+        </div>
       </div>
 
       {/* 기본 정보 */}
