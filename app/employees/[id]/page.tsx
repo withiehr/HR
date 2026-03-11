@@ -366,8 +366,7 @@ export default function EmployeeDetailPage() {
 
     container.innerHTML = `
       <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #1e40af;">
-        <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px;">직원 상세 정보</h1>
-        <p style="font-size:12px;color:#94a3b8;margin:0;">출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
+        <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0;">직원 상세 정보</h1>
       </div>
 
       <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
@@ -376,7 +375,7 @@ export default function EmployeeDetailPage() {
           : `<div style="width:80px;height:80px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;"><span style="font-size:28px;font-weight:700;color:#fff;">${employee.name.charAt(0)}</span></div>`
         }
         <div>
-          <h2 style="font-size:20px;font-weight:700;color:#1e293b;margin:0;">${employee.name}</h2>
+          <h2 style="font-size:20px;font-weight:700;color:#1e293b;margin:0;">${employee.name} <span style="font-size:14px;font-weight:400;color:#64748b;">(만 ${(() => { const b = new Date(employee.birthDate); const now = new Date(); let age = now.getFullYear() - b.getFullYear(); if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--; return age; })()}세)</span></h2>
           <p style="font-size:13px;color:#64748b;margin:4px 0 0;">${employee.employeeNumber} · ${employee.department} · ${employee.position} (${positionYears}년차)</p>
         </div>
       </div>
@@ -483,12 +482,11 @@ export default function EmployeeDetailPage() {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    let pos = 0;
     const pageHeight = pdf.internal.pageSize.getHeight();
-    while (pos < pdfHeight) {
-      if (pos > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -pos, pdfWidth, pdfHeight);
-      pos += pageHeight;
+    const totalPages = Math.ceil(pdfHeight / pageHeight);
+    for (let i = 0; i < totalPages; i++) {
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, -(i * pageHeight), pdfWidth, pdfHeight);
     }
 
     pdf.save(`${employee.name}_직원상세.pdf`);
@@ -830,7 +828,7 @@ export default function EmployeeDetailPage() {
             { label: '고용형태', value: employee.employmentType },
             { label: '입사일', value: formatDate(employee.hireDate) },
             { label: '재직상태', value: employee.status },
-            { label: '생년월일', value: formatDate(employee.birthDate) },
+            { label: '생년월일', value: `${formatDate(employee.birthDate)} (만 ${(() => { const b = new Date(employee.birthDate); const now = new Date(); let age = now.getFullYear() - b.getFullYear(); if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--; return age; })()}세)` },
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-xs text-gray-400 mb-0.5">{label}</p>
