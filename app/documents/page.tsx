@@ -216,7 +216,8 @@ export default function DocumentsPage() {
 
     if (uploadFile) {
       fileSize = uploadFile.size;
-      const filePath = `${form.employeeId || 'unknown'}/${Date.now()}_${uploadFile.name}`;
+      const ext = uploadFile.name.split('.').pop() || 'file';
+      const filePath = `${form.employeeId || 'unknown'}/${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
