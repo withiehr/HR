@@ -1,8 +1,9 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { Bell, Search } from 'lucide-react';
+import { Bell, LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': '대시보드',
@@ -10,13 +11,17 @@ const pageTitles: Record<string, string> = {
   '/personnel-history': '인사 이력 관리',
   '/certifications': '자격증 관리',
   '/evaluations': '인사 평가',
+  '/leaves': '연차 관리',
   '/resignations': '퇴사 관리',
   '/documents': '문서 관리',
   '/activity-logs': '활동 로그',
+  '/admin': '관리자',
 };
 
 export default function Header() {
   const pathname = usePathname();
+  const { user, role, signOut } = useAuth();
+  const ROLE_LABELS: Record<string, string> = { admin: '관리자', manager: '매니저', viewer: '뷰어' };
   const [showNotif, setShowNotif] = useState(false);
 
   // 직원 상세 페이지 제목 처리
@@ -61,9 +66,19 @@ export default function Header() {
         <div className="h-6 w-px bg-gray-200" />
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-            이
+            {user?.email?.[0]?.toUpperCase() || '?'}
           </div>
-          <span className="text-sm text-gray-700">이서연 (관리자)</span>
+          <div className="flex flex-col">
+            <span className="text-sm text-gray-700 leading-tight">{user?.email || ''}</span>
+            {role && <span className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[role] || role}</span>}
+          </div>
+          <button
+            onClick={signOut}
+            className="ml-1 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+            title="로그아웃"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
     </header>

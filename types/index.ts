@@ -31,6 +31,7 @@ export interface Employee {
   profileImage?: string;
   isProbation: boolean;
   probationEndDate?: string;
+  leaveEndDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,7 +64,7 @@ export interface PersonnelHistory {
 
 // ===== 자격증 타입 =====
 export type CertificationCategory = '국가기술자격' | '국가전문자격' | '민간자격' | '외국자격';
-export type CertificationStatus = '유효' | '만료' | '만료예정' | '갱신중';
+export type CertificationStatus = '유효' | '만료' | '만료예정' | '갱신중' | '선임' | '비선임';
 
 export interface Certification {
   id: string;
@@ -116,6 +117,7 @@ export interface Document {
   documentType: DocumentType;
   fileName: string;
   fileSize: number;
+  fileUrl?: string;
   uploadedBy: string;
   uploadedAt: string;
   description?: string;
@@ -183,12 +185,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   manager: [
     { menu: '대시보드', canView: true, canCreate: false, canEdit: false, canDelete: false },
-    { menu: '직원관리', canView: true, canCreate: true, canEdit: true, canDelete: false },
-    { menu: '인사이력', canView: true, canCreate: true, canEdit: true, canDelete: false },
-    { menu: '자격증관리', canView: true, canCreate: true, canEdit: true, canDelete: false },
-    { menu: '퇴사관리', canView: true, canCreate: true, canEdit: true, canDelete: false },
-    { menu: '문서관리', canView: true, canCreate: true, canEdit: false, canDelete: false },
-    { menu: '인사평가', canView: true, canCreate: true, canEdit: true, canDelete: false },
+    { menu: '직원관리', canView: true, canCreate: false, canEdit: false, canDelete: false },
+    { menu: '인사이력', canView: true, canCreate: false, canEdit: false, canDelete: false },
+    { menu: '자격증관리', canView: true, canCreate: false, canEdit: false, canDelete: false },
+    { menu: '퇴사관리', canView: true, canCreate: false, canEdit: false, canDelete: false },
+    { menu: '문서관리', canView: true, canCreate: false, canEdit: false, canDelete: false },
+    { menu: '인사평가', canView: true, canCreate: false, canEdit: false, canDelete: false },
     { menu: '활동로그', canView: true, canCreate: false, canEdit: false, canDelete: false },
   ],
   viewer: [

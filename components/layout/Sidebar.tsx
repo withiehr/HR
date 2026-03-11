@@ -14,9 +14,12 @@ import {
   ChevronRight,
   ClipboardList,
   Star,
+  Settings,
+  CalendarDays,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/components/AuthProvider';
 
 const navItems = [
   { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
@@ -24,14 +27,23 @@ const navItems = [
   { href: '/personnel-history', label: '인사 이력', icon: History },
   { href: '/certifications', label: '자격증 관리', icon: Award },
   { href: '/evaluations', label: '인사 평가', icon: Star },
+  { href: '/leaves', label: '연차 관리', icon: CalendarDays },
   { href: '/resignations', label: '퇴사 관리', icon: UserMinus },
   { href: '/documents', label: '문서 관리', icon: FileText },
   { href: '/activity-logs', label: '활동 로그', icon: ClipboardList },
+  { href: '/admin', label: '관리자', icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, role } = useAuth();
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: '관리자',
+    manager: '매니저',
+    viewer: '뷰어',
+  };
 
   return (
     <aside
@@ -56,7 +68,11 @@ export default function Sidebar() {
 
       {/* 네비게이션 */}
       <nav className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.filter(({ href }) => {
+          // 관리자 메뉴는 admin 역할만 접근
+          if (href === '/admin') return role === 'admin';
+          return true;
+        }).map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/');
           return (
             <Link
@@ -82,11 +98,11 @@ export default function Sidebar() {
         <div className="px-4 py-3 border-t border-slate-700">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-              관
+              {user?.email?.[0]?.toUpperCase() || '?'}
             </div>
-            <div>
-              <p className="text-xs text-slate-400">관리자</p>
-              <p className="text-sm text-slate-200 font-medium">이서연</p>
+            <div className="overflow-hidden">
+              <p className="text-xs text-slate-400">{role ? ROLE_LABELS[role] || role : '-'}</p>
+              <p className="text-sm text-slate-200 font-medium truncate">{user?.email || '-'}</p>
             </div>
           </div>
         </div>

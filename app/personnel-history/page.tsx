@@ -13,6 +13,7 @@ import { personnelHistories as initialData } from '@/data/personnel-history';
 import { employees, departments } from '@/data/employees';
 import { PersonnelHistory, PersonnelHistoryType } from '@/types';
 import { formatDate, paginate, generateId } from '@/lib/utils';
+import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
 
 const HISTORY_TYPES: PersonnelHistoryType[] = ['입사', '승진', '부서이동', '직책변경', '급여변경', '휴직', '복직', '징계', '포상', '퇴사'];
@@ -45,6 +46,8 @@ const emptyForm: HistoryForm = {
 };
 
 export default function PersonnelHistoryPage() {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [data, setData] = useState<PersonnelHistory[]>(initialData);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -155,7 +158,7 @@ export default function PersonnelHistoryPage() {
                 { key: 'registeredBy', label: '등록자' },
               ], '인사이력');
             }}><Download size={16} />엑셀</Button>
-            <Button onClick={openCreate}><Plus size={16} />이력 등록</Button>
+            {isAdmin && <Button onClick={openCreate}><Plus size={16} />이력 등록</Button>}
           </div>
         </div>
       </div>
@@ -187,9 +190,9 @@ export default function PersonnelHistoryPage() {
                       <td className="px-4 py-3 text-gray-600 max-w-md truncate">{h.details}</td>
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{h.registeredBy}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => openEdit(h)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
+                        {isAdmin && <button onClick={() => openEdit(h)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
                           <Pencil size={14} />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}

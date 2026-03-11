@@ -13,6 +13,7 @@ import { resignations as initialData } from '@/data/resignations';
 import { employees, departments } from '@/data/employees';
 import { Resignation, Position } from '@/types';
 import { formatDate, paginate, generateId } from '@/lib/utils';
+import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
 
 const RESIGN_REASONS = ['개인사유', '타사이직', '계약만료', '해외유학', '결혼/육아', '권고사직', '정년퇴직', '기타'];
@@ -66,6 +67,8 @@ function getCompletionStatus(r: Resignation): CompletionFilter {
 }
 
 export default function ResignationsPage() {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [data, setData] = useState<Resignation[]>(initialData);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -214,7 +217,7 @@ export default function ResignationsPage() {
                 { key: 'status', label: '처리상태' },
               ], '퇴사관리');
             }}><Download size={16} />엑셀</Button>
-            <Button onClick={openCreate}><Plus size={16} />퇴사 등록</Button>
+            {isAdmin && <Button onClick={openCreate}><Plus size={16} />퇴사 등록</Button>}
           </div>
         </div>
       </div>
@@ -252,9 +255,9 @@ export default function ResignationsPage() {
                       <td className="px-4 py-3 text-center"><CheckIcon value={r.severanceSettled} /></td>
                       <td className="px-4 py-3 whitespace-nowrap">{completionBadge(r)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => openEdit(r)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
+                        {isAdmin && <button onClick={() => openEdit(r)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
                           <Pencil size={14} />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}

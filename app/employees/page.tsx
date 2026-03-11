@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Pencil, Eye, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
@@ -10,11 +10,13 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { employees as initialEmployees, departments } from '@/data/employees';
-import { personnelHistories } from '@/data/personnel-history';
+import { departments } from '@/data/employees';
 import { Employee, EmploymentStatus, EmploymentType, Position } from '@/types';
-import { formatDate, paginate, generateId } from '@/lib/utils';
+import { formatDate, paginate } from '@/lib/utils';
+import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
+import { supabase } from '@/lib/supabase';
+import { rowToEmployee } from '@/lib/supabase-utils';
 
 const STATUS_OPTIONS = [
   { value: '재직', label: '재직' },
@@ -34,22 +36,12 @@ const POSITION_OPTIONS = [
   'Entry B', 'Entry A', 'Junior', 'Senior',
 ].map((p) => ({ value: p, label: p }));
 
-// 근속년수 계산: 매년 1월 1일 기준으로 입사연도 대비 올해 연도 차이
 function getServiceYears(hireDate: string): number {
   const hireYear = new Date(hireDate).getFullYear();
   const currentYear = new Date().getFullYear();
   return currentYear - hireYear;
 }
 
-// 최근 승진일 조회
-function getLastPromotionDate(employeeId: string): string | null {
-  const promotions = personnelHistories
-    .filter((h) => h.employeeId === employeeId && h.type === '승진')
-    .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
-  return promotions.length > 0 ? promotions[0].effectiveDate : null;
-}
-
-// 승진 후 경과 년수
 function getYearsSincePromotion(promotionDate: string): number {
   const promoYear = new Date(promotionDate).getFullYear();
   const currentYear = new Date().getFullYear();
@@ -106,7 +98,11 @@ const emptyForm: EmployeeForm = {
 
 export default function EmployeesPage() {
   const router = useRouter();
-  const [data, setData] = useState<Employee[]>(initialEmployees);
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+  const [data, setData] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [promotionDates, setPromotionDates] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -116,9 +112,40 @@ export default function EmployeesPage() {
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
 
+  const fetchEmployees = useCallback(async () => {
+    setLoading(true);
+    const { data: rows, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('employee_number', { ascending: true });
+    if (!error && rows) {
+      setData(rows.map(rowToEmployee));
+    }
+    setLoading(false);
+  }, []);
+
+  const fetchPromotionDates = useCallback(async () => {
+    const { data: rows } = await supabase
+      .from('personnel_histories')
+      .select('employee_id, effective_date')
+      .eq('type', '승진')
+      .order('effective_date', { ascending: false });
+    if (rows) {
+      const map: Record<string, string> = {};
+      rows.forEach((r: { employee_id: string; effective_date: string }) => {
+        if (!map[r.employee_id]) map[r.employee_id] = r.effective_date;
+      });
+      setPromotionDates(map);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchPromotionDates();
+  }, [fetchEmployees, fetchPromotionDates]);
+
   const filtered = useMemo(() => {
     return data.filter((e) => {
-      const q = search.toLowerCase();
       const matchSearch = !search || e.name.includes(search) || e.employeeNumber.includes(search) || e.department.includes(search) || e.phone.includes(search);
       const matchDept = !deptFilter || e.department === deptFilter;
       const matchStatus = !statusFilter || e.status === statusFilter;
@@ -156,39 +183,44 @@ export default function EmployeesPage() {
     setIsModalOpen(true);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name || !form.employeeNumber) {
       alert('사번과 이름은 필수입니다.');
       return;
     }
-    const now = new Date().toISOString();
-    if (editTarget) {
-      setData((prev) =>
-        prev.map((e) =>
-          e.id === editTarget.id
-            ? { ...e, ...form, probationEndDate: form.probationEndDate || undefined, updatedAt: now }
-            : e
-        )
-      );
-    } else {
-      const newEmp: Employee = {
-        ...form,
-        id: generateId('emp'),
-        probationEndDate: form.probationEndDate || undefined,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setData((prev) => [...prev, newEmp]);
-    }
-    setIsModalOpen(false);
-  }
 
-  function handleStatusChange(emp: Employee, newStatus: EmploymentStatus) {
-    setData((prev) =>
-      prev.map((e) =>
-        e.id === emp.id ? { ...e, status: newStatus, updatedAt: new Date().toISOString() } : e
-      )
-    );
+    const row = {
+      employee_number: form.employeeNumber,
+      name: form.name,
+      department: form.department,
+      position: form.position,
+      job_title: form.jobTitle,
+      employment_type: form.employmentType,
+      hire_date: form.hireDate || null,
+      status: form.status,
+      phone: form.phone,
+      email: form.email,
+      birth_date: form.birthDate || null,
+      address: form.address,
+      is_probation: form.isProbation,
+      probation_end_date: form.probationEndDate || null,
+    };
+
+    if (editTarget) {
+      const { error } = await supabase
+        .from('employees')
+        .update(row)
+        .eq('id', editTarget.id);
+      if (error) { alert('수정 실패: ' + error.message); return; }
+    } else {
+      const { error } = await supabase
+        .from('employees')
+        .insert(row);
+      if (error) { alert('등록 실패: ' + error.message); return; }
+    }
+
+    setIsModalOpen(false);
+    await fetchEmployees();
   }
 
   return (
@@ -223,7 +255,7 @@ export default function EmployeesPage() {
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => {
               const rows = filtered.map((emp) => {
-                const lastPromo = getLastPromotionDate(emp.id);
+                const lastPromo = promotionDates[emp.id];
                 return {
                   employeeNumber: emp.employeeNumber,
                   name: emp.name,
@@ -248,13 +280,13 @@ export default function EmployeesPage() {
                 { key: 'employmentType', label: '고용형태' },
                 { key: 'hireDate', label: '입사일' },
                 { key: 'serviceYears', label: '근속년수' },
-                { key: 'lastPromotion', label: '최근승진일' },
+                { key: 'lastPromotion', label: '현직급 시작' },
                 { key: 'status', label: '재직상태' },
                 { key: 'phone', label: '연락처' },
                 { key: 'email', label: '이메일' },
               ], '직원목록');
             }}><Download size={16} />엑셀</Button>
-            <Button onClick={openCreate}><Plus size={16} />직원 등록</Button>
+            {isAdmin && <Button onClick={openCreate}><Plus size={16} />직원 등록</Button>}
           </div>
         </div>
       </div>
@@ -264,7 +296,9 @@ export default function EmployeesPage() {
         <div className="px-5 py-3 border-b border-gray-100">
           <span className="text-sm text-gray-500">총 <span className="font-semibold text-gray-900">{filtered.length}</span>명</span>
         </div>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-gray-400 text-sm">데이터를 불러오는 중...</div>
+        ) : filtered.length === 0 ? (
           <EmptyState />
         ) : (
           <>
@@ -272,7 +306,7 @@ export default function EmployeesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    {['사번', '이름', '부서', '직급', '직책', '고용형태', '입사일', '근속년수', '최근승진일', '재직상태', '연락처', '관리'].map((h) => (
+                    {['사번', '이름', '부서', '직급', '직책', '고용형태', '입사일', '근속년수', '현직급 시작', '재직상태', '연락처', '관리'].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -301,12 +335,11 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                         {(() => {
-                          const lastPromotion = getLastPromotionDate(emp.id);
-                          if (!lastPromotion) return <span className="text-gray-400">-</span>;
-                          const years = getYearsSincePromotion(lastPromotion);
+                          const startDate = promotionDates[emp.id] || emp.hireDate;
+                          const years = getYearsSincePromotion(startDate);
                           return (
                             <div>
-                              <span>{formatDate(lastPromotion)}</span>
+                              <span>{formatDate(startDate)}</span>
                               <span className="ml-1.5 text-xs text-gray-400">({years}년차)</span>
                             </div>
                           );
@@ -317,7 +350,7 @@ export default function EmployeesPage() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <button onClick={() => router.push(`/employees/${emp.id}`)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md transition-colors" title="상세보기"><Eye size={14} /></button>
-                          <button onClick={() => openEdit(emp)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정"><Pencil size={14} /></button>
+                          {isAdmin && <button onClick={() => openEdit(emp)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정"><Pencil size={14} /></button>}
                         </div>
                       </td>
                     </tr>

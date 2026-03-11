@@ -142,6 +142,7 @@ export const employees: Employee[] = [
     birthDate: '1994-06-30',
     address: '인천광역시 동구 송림동 678-90',
     isProbation: false,
+    leaveEndDate: '2026-05-31',
     createdAt: '2022-09-01T09:00:00',
     updatedAt: '2025-02-01T08:00:00',
   },

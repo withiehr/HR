@@ -15,6 +15,7 @@ import { personnelHistories } from '@/data/personnel-history';
 import { Evaluation, EvaluationGrade, Position } from '@/types';
 import { paginate, generateId } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-excel';
+import { useAuth } from '@/components/AuthProvider';
 
 const GRADES: EvaluationGrade[] = ['S', 'A', 'B', 'C', 'D'];
 const POSITIONS: Position[] = ['Entry B', 'Entry A', 'Junior', 'Senior'];
@@ -120,6 +121,8 @@ const emptyForm: EvalForm = {
 };
 
 export default function EvaluationsPage() {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [data, setData] = useState<Evaluation[]>(initialData);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -329,7 +332,7 @@ export default function EvaluationsPage() {
                 { key: 'evaluator', label: '평가자' },
               ], '인사평가');
             }}><Download size={16} />엑셀</Button>
-            <Button onClick={openCreate}><Plus size={16} />평가 등록</Button>
+            {isAdmin && <Button onClick={openCreate}><Plus size={16} />평가 등록</Button>}
           </div>
         </div>
       </div>
@@ -400,9 +403,9 @@ export default function EvaluationsPage() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{ev.evaluatorName}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <button onClick={() => openEdit(ev)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
+                          {isAdmin && <button onClick={() => openEdit(ev)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
                             <Pencil size={14} />
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     );

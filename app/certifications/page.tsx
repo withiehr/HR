@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Pencil, AlertCircle, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -14,9 +14,13 @@ import { employees, departments } from '@/data/employees';
 import { Certification, CertificationCategory, CertificationStatus } from '@/types';
 import { formatDate, paginate, generateId, getDaysUntil } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-excel';
+import { useAuth } from '@/components/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 const CATEGORIES: CertificationCategory[] = ['국가기술자격', '국가전문자격', '민간자격', '외국자격'];
 const STATUS_OPTIONS: { value: CertificationStatus; label: string }[] = [
+  { value: '선임', label: '선임' },
+  { value: '비선임', label: '비선임' },
   { value: '유효', label: '유효' },
   { value: '만료예정', label: '만료예정' },
   { value: '만료', label: '만료' },
@@ -25,7 +29,7 @@ const STATUS_OPTIONS: { value: CertificationStatus; label: string }[] = [
 
 function certStatusBadge(status: CertificationStatus) {
   const map: Record<CertificationStatus, 'success' | 'warning' | 'danger' | 'info'> = {
-    유효: 'success', 만료예정: 'warning', 만료: 'danger', 갱신중: 'info',
+    선임: 'success', 비선임: 'info', 유효: 'success', 만료예정: 'warning', 만료: 'danger', 갱신중: 'info',
   };
   return <Badge variant={map[status]}>{status}</Badge>;
 }
@@ -51,24 +55,68 @@ const emptyForm: CertForm = {
   acquiredDate: '', expiryDate: '', status: '유효', certificateNumber: '',
 };
 
+function mapDbCert(r: any): Certification {
+  // employee 정보 찾기
+  const emp = employees.find((e) => e.id === r.employee_id);
+  return {
+    id: r.id,
+    employeeId: r.employee_id,
+    employeeName: emp?.name || r.employee_name || '',
+    department: emp?.department || r.department || '',
+    certificationName: r.certification_name,
+    category: r.category,
+    issuingOrganization: r.issuing_organization || '',
+    acquiredDate: r.acquired_date,
+    expiryDate: r.expiry_date || undefined,
+    status: r.status,
+    certificateNumber: r.certificate_number || undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at || r.created_at,
+  };
+}
+
 export default function CertificationsPage() {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [data, setData] = useState<Certification[]>(initialData);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [certNameFilter, setCertNameFilter] = useState('');
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Certification | null>(null);
   const [form, setForm] = useState<CertForm>(emptyForm);
+
+  // Supabase에서 자격증 데이터 가져와 합치기
+  useEffect(() => {
+    async function fetchSupabaseCerts() {
+      const { data: dbCerts, error } = await supabase
+        .from('certifications')
+        .select('*');
+      if (!error && dbCerts && dbCerts.length > 0) {
+        const mapped = dbCerts.map(mapDbCert);
+        // 정적 데이터의 ID와 중복되지 않는 것만 추가
+        const staticIds = new Set(initialData.map((c) => c.id));
+        const newCerts = mapped.filter((c) => !staticIds.has(c.id));
+        setData([...initialData, ...newCerts]);
+      }
+    }
+    fetchSupabaseCerts();
+  }, []);
+
+  // 자격증명 목록 (중복 제거)
+  const certNames = useMemo(() => Array.from(new Set(data.map((c) => c.certificationName))).sort(), [data]);
 
   const filtered = useMemo(() => {
     return data.filter((c) => {
       const matchSearch = !search || c.certificationName.includes(search) || c.employeeName.includes(search) || c.issuingOrganization.includes(search);
       const matchDept = !deptFilter || c.department === deptFilter;
       const matchStatus = !statusFilter || c.status === statusFilter;
-      return matchSearch && matchDept && matchStatus;
+      const matchCertName = !certNameFilter || c.certificationName === certNameFilter;
+      return matchSearch && matchDept && matchStatus && matchCertName;
     });
-  }, [data, search, deptFilter, statusFilter]);
+  }, [data, search, deptFilter, statusFilter, certNameFilter]);
 
   const { data: pageData, totalPages } = paginate(filtered, page, PAGE_SIZE);
   const expiringCount = data.filter((c) => c.status === '만료예정').length;
@@ -101,31 +149,70 @@ export default function CertificationsPage() {
     if (emp) setForm((prev) => ({ ...prev, employeeId: emp.id, employeeName: emp.name, department: emp.department }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.certificationName || !form.employeeName) {
       alert('자격증명과 직원명은 필수입니다.');
       return;
     }
     const now = new Date().toISOString();
+    const payload = {
+      employee_id: form.employeeId,
+      certification_name: form.certificationName,
+      category: form.category,
+      issuing_organization: form.issuingOrganization,
+      acquired_date: form.acquiredDate || null,
+      expiry_date: form.expiryDate || null,
+      status: form.status,
+      certificate_number: form.certificateNumber || null,
+    };
+
     if (editTarget) {
-      setData((prev) =>
-        prev.map((c) => c.id === editTarget.id ? {
-          ...c, ...form,
+      // Supabase에 있는 데이터면 DB도 업데이트
+      const { data: dbData } = await supabase
+        .from('certifications')
+        .update(payload)
+        .eq('id', editTarget.id)
+        .select()
+        .single();
+
+      if (dbData) {
+        const updated = mapDbCert(dbData);
+        setData((prev) => prev.map((c) => c.id === editTarget.id ? updated : c));
+      } else {
+        // 정적 데이터 수정 (로컬만)
+        setData((prev) =>
+          prev.map((c) => c.id === editTarget.id ? {
+            ...c, ...form,
+            expiryDate: form.expiryDate || undefined,
+            certificateNumber: form.certificateNumber || undefined,
+            updatedAt: now,
+          } : c)
+        );
+      }
+    } else {
+      // 새 자격증 등록 → Supabase에 저장
+      const { data: dbData, error } = await supabase
+        .from('certifications')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (dbData) {
+        const newCert = mapDbCert(dbData);
+        setData((prev) => [...prev, newCert]);
+      } else {
+        // DB 저장 실패 시 로컬만 추가
+        if (error) console.error('Supabase insert error:', error);
+        const newItem: Certification = {
+          ...form,
+          id: generateId('cert'),
           expiryDate: form.expiryDate || undefined,
           certificateNumber: form.certificateNumber || undefined,
+          createdAt: now,
           updatedAt: now,
-        } : c)
-      );
-    } else {
-      const newItem: Certification = {
-        ...form,
-        id: generateId('cert'),
-        expiryDate: form.expiryDate || undefined,
-        certificateNumber: form.certificateNumber || undefined,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setData((prev) => [...prev, newItem]);
+        };
+        setData((prev) => [...prev, newItem]);
+      }
     }
     setIsModalOpen(false);
   }
@@ -155,6 +242,11 @@ export default function CertificationsPage() {
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
               <option value="">전체 부서</option>
               {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select value={certNameFilter} onChange={(e) => { setCertNameFilter(e.target.value); setPage(1); }}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
+              <option value="">전체 자격증</option>
+              {certNames.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
@@ -187,7 +279,7 @@ export default function CertificationsPage() {
                 { key: 'certificateNumber', label: '자격증번호' },
               ], '자격증관리');
             }}><Download size={16} />엑셀</Button>
-            <Button onClick={openCreate}><Plus size={16} />자격증 등록</Button>
+            {isAdmin && <Button onClick={openCreate}><Plus size={16} />자격증 등록</Button>}
           </div>
         </div>
       </div>
@@ -235,9 +327,9 @@ export default function CertificationsPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">{certStatusBadge(cert.status)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button onClick={() => openEdit(cert)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
+                        {isAdmin && <button onClick={() => openEdit(cert)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
                           <Pencil size={14} />
-                        </button>
+                        </button>}
                       </td>
                     </tr>
                   ))}

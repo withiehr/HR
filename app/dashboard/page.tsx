@@ -1,11 +1,10 @@
 'use client';
 
-import { Users, Clock, Award, UserMinus, FileUp, AlertTriangle } from 'lucide-react';
+import { Users, Clock, UserCheck, UserMinus, FileUp, AlertTriangle } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import Badge from '@/components/ui/Badge';
 import { employees } from '@/data/employees';
 import { personnelHistories } from '@/data/personnel-history';
-import { certifications } from '@/data/certifications';
 import { documents } from '@/data/documents';
 import { formatDate, getDaysUntil } from '@/lib/utils';
 
@@ -27,12 +26,12 @@ export default function DashboardPage() {
     positionCounts[e.position] = (positionCounts[e.position] || 0) + 1;
   });
 
-  // 만료 예정 자격증 (6개월 이내)
-  const expiringCerts = certifications.filter((c) => {
-    if (!c.expiryDate) return false;
-    const days = getDaysUntil(c.expiryDate);
-    return days > 0 && days <= 180;
-  });
+  // 휴직 종료 예정자
+  const leaveEndingSoon = onLeave.filter((e) => {
+    if (!e.leaveEndDate) return false;
+    const days = getDaysUntil(e.leaveEndDate);
+    return days >= 0;
+  }).sort((a, b) => getDaysUntil(a.leaveEndDate!) - getDaysUntil(b.leaveEndDate!));
 
   // 최근 인사 변동
   const recentHistory = [...personnelHistories]
@@ -59,14 +58,17 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="총 재직 인원" value={`${activeEmployees.length}명`} icon={Users} color="blue" change={`전체 ${employees.length}명 (휴직 ${onLeave.length}명)`} />
         <StatCard title="수습 중인 직원" value={`${probation.length}명`} icon={Clock} color="amber" change={probation.map((e) => e.name).join(', ') || '없음'} />
-        <StatCard title="만료 예정 자격증" value={`${expiringCerts.length}건`} icon={Award} color="red" change="6개월 이내" />
+        <StatCard title="휴직 종료 예정" value={`${leaveEndingSoon.length}명`} icon={UserCheck} color="red" change={`현재 휴직 ${onLeave.length}명`} />
         <StatCard title="퇴사 인원 (누적)" value={`${resigned.length}명`} icon={UserMinus} color="slate" />
       </div>
 
       {/* 부서별/직급별 인원 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">부서별 인원</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">부서별 인원</h3>
+            <span className="text-xs text-gray-500">총 <span className="font-semibold text-gray-900">{employees.length}</span>명 (재직 {activeEmployees.length} · 휴직 {onLeave.length} · 퇴사 {resigned.length})</span>
+          </div>
           <div className="space-y-3">
             {Object.entries(deptCounts)
               .sort((a, b) => b[1] - a[1])
@@ -108,23 +110,23 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle size={16} className="text-amber-500" />
-            <h3 className="text-sm font-semibold text-gray-900">자격증 만료 예정</h3>
+            <h3 className="text-sm font-semibold text-gray-900">휴직 종료 예정자</h3>
           </div>
-          {expiringCerts.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">만료 예정 자격증이 없습니다</p>
+          {leaveEndingSoon.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">휴직 종료 예정자가 없습니다</p>
           ) : (
             <div className="space-y-0">
-              {expiringCerts.map((cert) => {
-                const days = getDaysUntil(cert.expiryDate!);
+              {leaveEndingSoon.map((emp) => {
+                const days = getDaysUntil(emp.leaveEndDate!);
                 return (
-                  <div key={cert.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
+                  <div key={emp.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{cert.employeeName}</p>
-                      <p className="text-xs text-gray-500">{cert.certificationName}</p>
+                      <p className="text-sm font-medium text-gray-800">{emp.name}</p>
+                      <p className="text-xs text-gray-500">{emp.department} / {emp.position}</p>
                     </div>
                     <div className="text-right">
-                      <Badge variant={days <= 90 ? 'danger' : 'warning'}>D-{days}</Badge>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(cert.expiryDate!)}</p>
+                      <Badge variant={days <= 30 ? 'danger' : days <= 90 ? 'warning' : 'info'}>D-{days}</Badge>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(emp.leaveEndDate!)}</p>
                     </div>
                   </div>
                 );

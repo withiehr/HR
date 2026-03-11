@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from 'clsx';
+import { ROLE_PERMISSIONS, type UserRole } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -40,4 +41,12 @@ export function paginate<T>(items: T[], page: number, pageSize: number): { data:
   const start = (page - 1) * pageSize;
   const data = items.slice(start, start + pageSize);
   return { data, totalPages };
+}
+
+// 역할별 권한 체크
+export function getPermission(role: UserRole | null, menu: string) {
+  if (!role) return { canView: false, canCreate: false, canEdit: false, canDelete: false };
+  const perms = ROLE_PERMISSIONS[role];
+  const found = perms.find((p) => p.menu === menu);
+  return found || { canView: false, canCreate: false, canEdit: false, canDelete: false };
 }
