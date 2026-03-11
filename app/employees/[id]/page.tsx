@@ -263,12 +263,12 @@ export default function EmployeeDetailPage() {
       // Fetch all data in parallel
       const [empRes, histRes, evalRes, certRes, docRes, resignRes, careerRes, leaveRes] = await Promise.all([
         supabase.from('employees').select('*').eq('id', id).single(),
-        supabase.from('personnel_histories').select('*').eq('employee_id', id).order('effective_date', { ascending: false }),
+        supabase.from('personnel_histories').select('*').eq('employee_id', id).order('effective_date', { ascending: true }),
         supabase.from('evaluations').select('*').eq('employee_id', id).order('year', { ascending: false }),
-        supabase.from('certifications').select('*').eq('employee_id', id),
+        supabase.from('certifications').select('*').eq('employee_id', id).order('acquired_date', { ascending: true }),
         supabase.from('documents').select('*').eq('employee_id', id),
         supabase.from('resignations').select('*').eq('employee_id', id).single(),
-        supabase.from('career_histories').select('*').eq('employee_id', id).order('start_date', { ascending: false }),
+        supabase.from('career_histories').select('*').eq('employee_id', id).order('start_date', { ascending: true }),
         supabase.from('leave_records').select('*').eq('employee_id', id).order('start_date', { ascending: false }),
       ]);
 
