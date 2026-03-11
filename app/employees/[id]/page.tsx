@@ -609,7 +609,8 @@ export default function EmployeeDetailPage() {
     setDocUploading(true);
     try {
       const timestamp = Date.now();
-      const storagePath = `${employee.id}/${timestamp}_${docUploadFile.name}`;
+      const ext = docUploadFile.name.split('.').pop() || 'file';
+      const storagePath = `${employee.id}/${timestamp}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(storagePath, docUploadFile);
