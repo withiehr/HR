@@ -325,40 +325,148 @@ export default function EmployeeDetailPage() {
   };
 
   const handlePdfDownload = async () => {
+    if (!employee) return;
     const { default: html2canvas } = await import('html2canvas-pro');
     const { default: jsPDF } = await import('jspdf');
 
-    const content = document.getElementById('employee-detail-content');
-    if (!content) return;
+    // PDF 전용 숨겨진 HTML 생성
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;background:#fff;padding:40px;font-family:system-ui,-apple-system,sans-serif;';
 
-    // 숨길 요소 (버튼 등)
-    const buttons = content.querySelectorAll('button, input[type=file]');
-    buttons.forEach((el) => (el as HTMLElement).style.visibility = 'hidden');
+    const certRows = empCerts.map(c =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.certificationName}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.category}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.issuingOrganization}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(c.acquiredDate)}</td></tr>`
+    ).join('');
 
-    const canvas = await html2canvas(content, {
+    const historyRows = empHistories.slice(0, 10).map(h =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(h.effectiveDate)}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${h.type}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${h.details}</td></tr>`
+    ).join('');
+
+    const careerRows = careers.map(c =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.companyName}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.position}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(c.startDate)} ~ ${formatDate(c.endDate)}</td></tr>`
+    ).join('');
+
+    container.innerHTML = `
+      <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #1e40af;">
+        <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0 0 4px;">직원 상세 정보</h1>
+        <p style="font-size:12px;color:#94a3b8;margin:0;">출력일: ${new Date().toLocaleDateString('ko-KR')}</p>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
+        ${employee.profileImage
+          ? `<img src="${employee.profileImage}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb;" crossorigin="anonymous" />`
+          : `<div style="width:80px;height:80px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;"><span style="font-size:28px;font-weight:700;color:#fff;">${employee.name.charAt(0)}</span></div>`
+        }
+        <div>
+          <h2 style="font-size:20px;font-weight:700;color:#1e293b;margin:0;">${employee.name}</h2>
+          <p style="font-size:13px;color:#64748b;margin:4px 0 0;">${employee.employeeNumber} · ${employee.department} · ${employee.position} (${positionYears}년차)</p>
+        </div>
+      </div>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 16px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">기본 정보</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;width:80px;">사번</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;width:200px;">${employee.employeeNumber}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;width:80px;">이름</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.name}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">부서</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.department}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">직급</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.position} (${positionYears}년차 · ${formatDate(positionStartDate)}~)</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">직책</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.jobTitle || '-'}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">고용형태</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.employmentType}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">입사일</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${formatDate(employee.hireDate)}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">재직상태</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.status}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">생년월일</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${formatDate(employee.birthDate)}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">연락처</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.phone || '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">이메일</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.email || '-'}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">주소</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.address || '-'}</td>
+          </tr>
+        </table>
+      </div>
+
+      ${empCerts.length > 0 ? `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">자격증</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">자격증명</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">분류</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">발급기관</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">취득일</th></tr>
+          ${certRows}
+        </table>
+      </div>` : ''}
+
+      ${careers.length > 0 ? `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">경력사항</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">회사명</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">직위</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">기간</th></tr>
+          ${careerRows}
+        </table>
+      </div>` : ''}
+
+      ${empHistories.length > 0 ? `
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">인사이력</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">일자</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">구분</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">내용</th></tr>
+          ${historyRows}
+        </table>
+      </div>` : ''}
+
+      <div style="text-align:center;padding-top:16px;border-top:1px solid #e2e8f0;">
+        <p style="font-size:11px;color:#94a3b8;">위드인천에너지(주) 인사관리시스템</p>
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    // 이미지 로딩 대기
+    const imgs = container.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(img => new Promise(resolve => {
+      if (img.complete) resolve(true);
+      else { img.onload = () => resolve(true); img.onerror = () => resolve(true); }
+    })));
+
+    const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
-      backgroundColor: '#f9fafb',
+      backgroundColor: '#ffffff',
     });
 
-    buttons.forEach((el) => (el as HTMLElement).style.visibility = '');
+    document.body.removeChild(container);
 
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    let position = 0;
+    let pos = 0;
     const pageHeight = pdf.internal.pageSize.getHeight();
-
-    // 여러 페이지 지원
-    while (position < pdfHeight) {
-      if (position > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -position, pdfWidth, pdfHeight);
-      position += pageHeight;
+    while (pos < pdfHeight) {
+      if (pos > 0) pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, -pos, pdfWidth, pdfHeight);
+      pos += pageHeight;
     }
 
-    pdf.save(`${employee!.name}_직원상세.pdf`);
+    pdf.save(`${employee.name}_직원상세.pdf`);
   };
 
   const openCareerModal = (career?: CareerHistory) => {
