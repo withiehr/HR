@@ -358,7 +358,7 @@ export default function EmployeeDetailPage() {
       position += pageHeight;
     }
 
-    pdf.save(`${employee.name}_직원상세.pdf`);
+    pdf.save(`${employee!.name}_직원상세.pdf`);
   };
 
   const openCareerModal = (career?: CareerHistory) => {
