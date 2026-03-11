@@ -297,7 +297,7 @@ export default function EmployeeDetailPage() {
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        alert('사진 업로드 실패: ' + uploadError.message);
         setUploading(false);
         return;
       }
@@ -306,16 +306,20 @@ export default function EmployeeDetailPage() {
         .from('profiles')
         .getPublicUrl(filePath);
 
-      const publicUrl = urlData.publicUrl;
+      const publicUrl = urlData.publicUrl + '?t=' + Date.now();
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('employees')
         .update({ profile_image: publicUrl })
         .eq('id', employee.id);
 
-      setEmployee({ ...employee, profileImage: publicUrl });
-    } catch (err) {
-      console.error('Photo upload failed:', err);
+      if (updateError) {
+        alert('프로필 저장 실패: ' + updateError.message);
+      } else {
+        setEmployee({ ...employee, profileImage: publicUrl });
+      }
+    } catch (err: any) {
+      alert('사진 업로드 오류: ' + (err?.message || err));
     }
     setUploading(false);
   };
