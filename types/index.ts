@@ -13,6 +13,7 @@ export interface User {
 export type EmploymentStatus = '재직' | '휴직' | '퇴사';
 export type EmploymentType = '정규직' | '계약직' | '인턴' | '파견직' | '일용직';
 export type Position = 'CEO' | 'PD' | 'Entry B' | 'Entry A' | 'Junior' | 'Senior';
+export type EducationLevel = '고졸' | '초대졸' | '대졸';
 
 export interface Employee {
   id: string;
@@ -29,6 +30,9 @@ export interface Employee {
   birthDate: string;
   address: string;
   profileImage?: string;
+  educationLevel?: EducationLevel;
+  schoolName?: string;
+  major?: string;
   isProbation: boolean;
   probationEndDate?: string;
   leaveEndDate?: string;

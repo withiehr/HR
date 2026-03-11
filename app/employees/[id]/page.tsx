@@ -249,6 +249,10 @@ export default function EmployeeDetailPage() {
   });
   const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
 
+  // 학력
+  const [editingEducation, setEditingEducation] = useState(false);
+  const [eduForm, setEduForm] = useState({ educationLevel: '', schoolName: '', major: '' });
+
   useEffect(() => {
     if (!params.id) return;
 
@@ -322,6 +326,21 @@ export default function EmployeeDetailPage() {
       alert('사진 업로드 오류: ' + (err?.message || err));
     }
     setUploading(false);
+  };
+
+  const handleEducationSave = async () => {
+    if (!employee) return;
+    const { error } = await supabase.from('employees').update({
+      education_level: eduForm.educationLevel || null,
+      school_name: eduForm.schoolName || null,
+      major: eduForm.major || null,
+    }).eq('id', employee.id);
+    if (error) {
+      alert('학력 저장 실패: ' + error.message);
+    } else {
+      setEmployee({ ...employee, educationLevel: eduForm.educationLevel as any, schoolName: eduForm.schoolName, major: eduForm.major });
+      setEditingEducation(false);
+    }
   };
 
   const handlePdfDownload = async () => {
@@ -400,6 +419,12 @@ export default function EmployeeDetailPage() {
             <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.email || '-'}</td>
             <td style="padding:6px 0;font-size:12px;color:#94a3b8;">주소</td>
             <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.address || '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">최종학력</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.educationLevel || '-'}</td>
+            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">학교/학과</td>
+            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.schoolName || '-'}${employee.major ? ' / ' + employee.major : ''}</td>
           </tr>
         </table>
       </div>
@@ -830,6 +855,61 @@ export default function EmployeeDetailPage() {
               수습 종료 예정일: <span className="font-semibold">{formatDate(employee.probationEndDate)}</span>
               {' '}(D-{Math.max(0, getDaysUntil(employee.probationEndDate))})
             </p>
+          </div>
+        )}
+      </div>
+
+      {/* 학력 정보 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <Award size={16} className="text-gray-400" /> 학력 정보
+          </h3>
+          {!editingEducation ? (
+            <button onClick={() => { setEduForm({ educationLevel: employee.educationLevel || '', schoolName: employee.schoolName || '', major: employee.major || '' }); setEditingEducation(true); }} className="text-xs text-blue-500 hover:text-blue-700">
+              <Edit2 size={14} className="inline mr-1" />수정
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={handleEducationSave} className="text-xs text-blue-500 hover:text-blue-700 font-medium">저장</button>
+              <button onClick={() => setEditingEducation(false)} className="text-xs text-gray-400 hover:text-gray-600">취소</button>
+            </div>
+          )}
+        </div>
+        {editingEducation ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">최종학력</p>
+              <select value={eduForm.educationLevel} onChange={(e) => setEduForm({ ...eduForm, educationLevel: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">선택</option>
+                <option value="고졸">고졸</option>
+                <option value="초대졸">초대졸</option>
+                <option value="대졸">대졸</option>
+              </select>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">학교명</p>
+              <input type="text" value={eduForm.schoolName} onChange={(e) => setEduForm({ ...eduForm, schoolName: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="학교명 입력" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-1">학과</p>
+              <input type="text" value={eduForm.major} onChange={(e) => setEduForm({ ...eduForm, major: e.target.value })} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="학과 입력" />
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">최종학력</p>
+              <p className="text-sm font-medium text-gray-800">{employee.educationLevel || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">학교명</p>
+              <p className="text-sm font-medium text-gray-800">{employee.schoolName || '-'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">학과</p>
+              <p className="text-sm font-medium text-gray-800">{employee.major || '-'}</p>
+            </div>
           </div>
         )}
       </div>
