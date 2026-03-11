@@ -112,6 +112,7 @@ export function rowToDocument(r: any): Document {
     uploadedBy: r.uploaded_by ?? '',
     uploadedAt: r.uploaded_at,
     description: r.description,
+    fileUrl: r.file_url,
   };
 }
 

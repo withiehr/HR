@@ -9,13 +9,12 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { documents as initialDocs } from '@/data/documents';
-import { employees, departments } from '@/data/employees';
-import { Document, DocumentType } from '@/types';
+import { Document, DocumentType, Employee } from '@/types';
 import { formatDate, formatFileSize, paginate, generateId } from '@/lib/utils';
 import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
 import { supabase } from '@/lib/supabase';
+import { rowToEmployee, rowToDocument } from '@/lib/supabase-utils';
 
 const DOC_TYPES: DocumentType[] = ['근로계약서', '연봉계약서', '인사발령문서', '자격증사본', '입사서류', '퇴사서류'];
 
@@ -58,7 +57,9 @@ const emptyForm: DocForm = {
 export default function DocumentsPage() {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
-  const [data, setData] = useState<Document[]>(initialDocs);
+  const [data, setData] = useState<Document[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -90,6 +91,23 @@ export default function DocumentsPage() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    async function fetchData() {
+      const [docRes, empRes] = await Promise.all([
+        supabase.from('documents').select('*, employees(name, department)').order('uploaded_at', { ascending: false }),
+        supabase.from('employees').select('*').order('name'),
+      ]);
+      if (docRes.data) setData(docRes.data.map(rowToDocument));
+      if (empRes.data) {
+        const emps = empRes.data.map(rowToEmployee);
+        setEmployees(emps);
+        const deptSet = new Set(emps.map(e => e.department));
+        setDepartments(Array.from(deptSet).sort());
+      }
+    }
+    fetchData();
   }, []);
 
   // 연도 목록 (데이터에서 추출)
@@ -211,16 +229,22 @@ export default function DocumentsPage() {
       }
     }
 
-    const newDoc: Document = {
-      ...form,
-      id: generateId('doc'),
-      fileSize,
-      fileUrl,
-      uploadedBy: '관리자',
-      uploadedAt: new Date().toISOString(),
-      description: form.description || undefined,
+    const row = {
+      employee_id: form.employeeId || null,
+      document_type: form.documentType,
+      file_name: form.fileName,
+      file_size: fileSize,
+      file_url: fileUrl,
+      uploaded_by: '관리자',
+      description: form.description || null,
     };
-    setData((prev) => [...prev, newDoc]);
+
+    const { data: inserted, error } = await supabase.from('documents').insert(row).select('*, employees(name, department)').single();
+    if (error) {
+      alert('문서 등록 실패: ' + error.message);
+    } else if (inserted) {
+      setData((prev) => [rowToDocument(inserted), ...prev]);
+    }
     setIsModalOpen(false);
     setUploadFile(null);
     setUploading(false);
