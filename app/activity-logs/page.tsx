@@ -5,7 +5,7 @@ import { Search, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { activityLogs } from '@/data/activity-logs';
+// Activity logs - Supabase 연동 예정
 import { ActionType, MenuType } from '@/types';
 import { formatDateTime, paginate } from '@/lib/utils';
 import Button from '@/components/ui/Button';
@@ -39,7 +39,8 @@ export default function ActivityLogsPage() {
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
-    return activityLogs.filter((log) => {
+    const activityLogs: any[] = [];
+    return activityLogs.filter((log: any) => {
       const matchSearch = !search || log.userName.includes(search) || log.targetName?.includes(search) || log.description.includes(search);
       const matchMenu = !menuFilter || log.menu === menuFilter;
       const matchAction = !actionFilter || log.actionType === actionFilter;

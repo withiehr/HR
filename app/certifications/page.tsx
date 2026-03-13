@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { Search, Plus, Pencil, AlertCircle, Download } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, Plus, Pencil, Trash2, AlertCircle, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -9,13 +9,20 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { certifications as initialData } from '@/data/certifications';
-import { employees, departments } from '@/data/employees';
+import { supabase } from '@/lib/supabase';
 import { Certification, CertificationCategory, CertificationStatus } from '@/types';
-import { formatDate, paginate, generateId, getDaysUntil } from '@/lib/utils';
+import { formatDate, paginate, getDaysUntil } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-excel';
 import { useAuth } from '@/components/AuthProvider';
-import { supabase } from '@/lib/supabase';
+
+interface EmployeeRow {
+  id: string;
+  employee_number: string;
+  name: string;
+  department: string;
+  position: string;
+  status: string;
+}
 
 const CATEGORIES: CertificationCategory[] = ['국가기술자격', '국가전문자격', '민간자격', '외국자격'];
 const STATUS_OPTIONS: { value: CertificationStatus; label: string }[] = [
@@ -55,30 +62,31 @@ const emptyForm: CertForm = {
   acquiredDate: '', expiryDate: '', status: '유효', certificateNumber: '',
 };
 
-function mapDbCert(r: any): Certification {
-  // employee 정보 찾기
-  const emp = employees.find((e) => e.id === r.employee_id);
+function mapDbCert(r: Record<string, unknown>, employeeList: EmployeeRow[]): Certification {
+  const emp = employeeList.find((e) => e.id === r.employee_id);
   return {
-    id: r.id,
-    employeeId: r.employee_id,
-    employeeName: emp?.name || r.employee_name || '',
-    department: emp?.department || r.department || '',
-    certificationName: r.certification_name,
-    category: r.category,
-    issuingOrganization: r.issuing_organization || '',
-    acquiredDate: r.acquired_date,
-    expiryDate: r.expiry_date || undefined,
-    status: r.status,
-    certificateNumber: r.certificate_number || undefined,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at || r.created_at,
+    id: r.id as string,
+    employeeId: r.employee_id as string,
+    employeeName: emp?.name || '',
+    department: emp?.department || '',
+    certificationName: (r.name as string) || '',
+    category: (r.category as CertificationCategory) || '국가기술자격',
+    issuingOrganization: (r.issuing_organization as string) || '',
+    acquiredDate: (r.acquired_date as string) || '',
+    expiryDate: (r.expiry_date as string) || undefined,
+    status: (r.status as CertificationStatus) || '유효',
+    certificateNumber: (r.certificate_number as string) || undefined,
+    createdAt: r.created_at as string,
+    updatedAt: (r.updated_at as string) || (r.created_at as string),
   };
 }
 
 export default function CertificationsPage() {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
-  const [data, setData] = useState<Certification[]>(initialData);
+  const [data, setData] = useState<Certification[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -88,22 +96,42 @@ export default function CertificationsPage() {
   const [editTarget, setEditTarget] = useState<Certification | null>(null);
   const [form, setForm] = useState<CertForm>(emptyForm);
 
-  // Supabase에서 자격증 데이터 가져와 합치기
-  useEffect(() => {
-    async function fetchSupabaseCerts() {
-      const { data: dbCerts, error } = await supabase
-        .from('certifications')
-        .select('*');
-      if (!error && dbCerts && dbCerts.length > 0) {
-        const mapped = dbCerts.map(mapDbCert);
-        // 정적 데이터의 ID와 중복되지 않는 것만 추가
-        const staticIds = new Set(initialData.map((c) => c.id));
-        const newCerts = mapped.filter((c) => !staticIds.has(c.id));
-        setData([...initialData, ...newCerts]);
-      }
+  const fetchEmployees = useCallback(async () => {
+    const { data: empRows, error } = await supabase
+      .from('employees')
+      .select('id, employee_number, name, department, position, status');
+    if (error) {
+      console.error('Failed to fetch employees:', error);
+      return [];
     }
-    fetchSupabaseCerts();
+    const rows = (empRows || []) as EmployeeRow[];
+    setEmployees(rows);
+    const depts = Array.from(new Set(rows.map((e) => e.department).filter(Boolean))).sort();
+    setDepartments(depts);
+    return rows;
   }, []);
+
+  const fetchCertifications = useCallback(async (employeeList: EmployeeRow[]) => {
+    const { data: dbCerts, error } = await supabase
+      .from('certifications')
+      .select('*');
+    if (error) {
+      console.error('Failed to fetch certifications:', error);
+      return;
+    }
+    if (dbCerts) {
+      const mapped = dbCerts.map((r) => mapDbCert(r as Record<string, unknown>, employeeList));
+      setData(mapped);
+    }
+  }, []);
+
+  useEffect(() => {
+    async function init() {
+      const empList = await fetchEmployees();
+      await fetchCertifications(empList);
+    }
+    init();
+  }, [fetchEmployees, fetchCertifications]);
 
   // 자격증명 목록 (중복 제거)
   const certNames = useMemo(() => Array.from(new Set(data.map((c) => c.certificationName))).sort(), [data]);
@@ -154,10 +182,9 @@ export default function CertificationsPage() {
       alert('자격증명과 직원명은 필수입니다.');
       return;
     }
-    const now = new Date().toISOString();
     const payload = {
       employee_id: form.employeeId,
-      certification_name: form.certificationName,
+      name: form.certificationName,
       category: form.category,
       issuing_organization: form.issuingOrganization,
       acquired_date: form.acquiredDate || null,
@@ -167,54 +194,54 @@ export default function CertificationsPage() {
     };
 
     if (editTarget) {
-      // Supabase에 있는 데이터면 DB도 업데이트
-      const { data: dbData } = await supabase
+      const { data: dbData, error } = await supabase
         .from('certifications')
-        .update(payload)
+        .update({ ...payload, updated_at: new Date().toISOString() })
         .eq('id', editTarget.id)
         .select()
         .single();
 
+      if (error) {
+        console.error('Supabase update error:', error);
+        alert('수정에 실패했습니다.');
+        return;
+      }
       if (dbData) {
-        const updated = mapDbCert(dbData);
+        const updated = mapDbCert(dbData as Record<string, unknown>, employees);
         setData((prev) => prev.map((c) => c.id === editTarget.id ? updated : c));
-      } else {
-        // 정적 데이터 수정 (로컬만)
-        setData((prev) =>
-          prev.map((c) => c.id === editTarget.id ? {
-            ...c, ...form,
-            expiryDate: form.expiryDate || undefined,
-            certificateNumber: form.certificateNumber || undefined,
-            updatedAt: now,
-          } : c)
-        );
       }
     } else {
-      // 새 자격증 등록 → Supabase에 저장
       const { data: dbData, error } = await supabase
         .from('certifications')
         .insert(payload)
         .select()
         .single();
 
+      if (error) {
+        console.error('Supabase insert error:', error);
+        alert('등록에 실패했습니다.');
+        return;
+      }
       if (dbData) {
-        const newCert = mapDbCert(dbData);
+        const newCert = mapDbCert(dbData as Record<string, unknown>, employees);
         setData((prev) => [...prev, newCert]);
-      } else {
-        // DB 저장 실패 시 로컬만 추가
-        if (error) console.error('Supabase insert error:', error);
-        const newItem: Certification = {
-          ...form,
-          id: generateId('cert'),
-          expiryDate: form.expiryDate || undefined,
-          certificateNumber: form.certificateNumber || undefined,
-          createdAt: now,
-          updatedAt: now,
-        };
-        setData((prev) => [...prev, newItem]);
       }
     }
     setIsModalOpen(false);
+  }
+
+  async function handleDelete(certId: string) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase
+      .from('certifications')
+      .delete()
+      .eq('id', certId);
+    if (error) {
+      console.error('Supabase delete error:', error);
+      alert('삭제에 실패했습니다.');
+      return;
+    }
+    setData((prev) => prev.filter((c) => c.id !== certId));
   }
 
   return (
@@ -327,9 +354,16 @@ export default function CertificationsPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">{certStatusBadge(cert.status)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {isAdmin && <button onClick={() => openEdit(cert)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
-                          <Pencil size={14} />
-                        </button>}
+                        {isAdmin && (
+                          <div className="flex gap-1">
+                            <button onClick={() => openEdit(cert)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors" title="수정">
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => handleDelete(cert.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors" title="삭제">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

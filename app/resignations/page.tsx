@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, Plus, Pencil, CheckCircle2, XCircle, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -9,17 +9,29 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { resignations as initialData } from '@/data/resignations';
-import { employees, departments } from '@/data/employees';
+import { supabase } from '@/lib/supabase';
 import { Resignation, Position } from '@/types';
-import { formatDate, paginate, generateId } from '@/lib/utils';
+import { formatDate, paginate } from '@/lib/utils';
 import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
 
-const RESIGN_REASONS = ['개인사유', '타사이직', '계약만료', '해외유학', '결혼/육아', '권고사직', '정년퇴직', '기타'];
+interface EmployeeRow {
+  id: string;
+  employee_number: string;
+  name: string;
+  department: string;
+  position: Position;
+  status: string;
+}
 
-const POSITION_OPTIONS = ['Entry B', 'Entry A', 'Junior', 'Senior']
-  .map((p) => ({ value: p, label: p }));
+interface EmployeeOption {
+  id: string;
+  name: string;
+  department: string;
+  position: Position;
+}
+
+const RESIGN_REASONS = ['개인사유', '타사이직', '계약만료', '해외유학', '결혼/육아', '권고사직', '정년퇴직', '기타'];
 
 function CheckIcon({ value }: { value: boolean }) {
   return value
@@ -50,13 +62,6 @@ interface ResignForm {
   severanceSettled: boolean;
 }
 
-const emptyForm: ResignForm = {
-  employeeId: '', employeeName: '', department: departments[0], position: 'Entry A',
-  resignationDate: '', reason: '개인사유', reasonDetail: '',
-  handoverCompleted: false, assetReturned: false, accountDeactivated: false, severanceSettled: false,
-
-};
-
 type CompletionFilter = '' | '완료' | '진행중' | '미완료';
 
 function getCompletionStatus(r: Resignation): CompletionFilter {
@@ -66,10 +71,34 @@ function getCompletionStatus(r: Resignation): CompletionFilter {
   return '미완료';
 }
 
+/** Parse the status JSON stored in the DB `status` column into the 4 booleans */
+function parseStatusJson(raw: string | null): {
+  handoverCompleted: boolean;
+  assetReturned: boolean;
+  accountDeactivated: boolean;
+  severanceSettled: boolean;
+} {
+  const defaults = { handoverCompleted: false, assetReturned: false, accountDeactivated: false, severanceSettled: false };
+  if (!raw) return defaults;
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      handoverCompleted: !!parsed.handoverCompleted,
+      assetReturned: !!parsed.assetReturned,
+      accountDeactivated: !!parsed.accountDeactivated,
+      severanceSettled: !!parsed.severanceSettled,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export default function ResignationsPage() {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
-  const [data, setData] = useState<Resignation[]>(initialData);
+  const [data, setData] = useState<Resignation[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [reasonFilter, setReasonFilter] = useState('');
@@ -78,7 +107,77 @@ export default function ResignationsPage() {
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Resignation | null>(null);
-  const [form, setForm] = useState<ResignForm>(emptyForm);
+  const [form, setForm] = useState<ResignForm>({
+    employeeId: '', employeeName: '', department: '', position: 'Entry A',
+    resignationDate: '', reason: '개인사유', reasonDetail: '',
+    handoverCompleted: false, assetReturned: false, accountDeactivated: false, severanceSettled: false,
+  });
+
+  const fetchEmployees = useCallback(async () => {
+    const { data: rows, error } = await supabase
+      .from('employees')
+      .select('id, employee_number, name, department, position, status');
+    if (error) {
+      console.error('Failed to fetch employees:', error);
+      return;
+    }
+    const empRows = (rows ?? []) as EmployeeRow[];
+    const mapped: EmployeeOption[] = empRows.map((e) => ({
+      id: e.id,
+      name: e.name,
+      department: e.department,
+      position: e.position as Position,
+    }));
+    setEmployees(mapped);
+    const depts = Array.from(new Set(empRows.map((e) => e.department))).filter(Boolean).sort();
+    setDepartments(depts);
+  }, []);
+
+  const fetchResignations = useCallback(async () => {
+    // Fetch resignations joined with employee info
+    const { data: rows, error } = await supabase
+      .from('resignations')
+      .select(`
+        id,
+        employee_id,
+        resignation_date,
+        last_working_date,
+        reason,
+        type,
+        status,
+        notes,
+        created_at,
+        updated_at,
+        employees ( id, name, department, position )
+      `);
+    if (error) {
+      console.error('Failed to fetch resignations:', error);
+      return;
+    }
+    const mapped: Resignation[] = (rows ?? []).map((row: Record<string, unknown>) => {
+      const emp = row.employees as { id: string; name: string; department: string; position: string } | null;
+      const statusBools = parseStatusJson(row.status as string | null);
+      return {
+        id: row.id as string,
+        employeeId: row.employee_id as string,
+        employeeName: emp?.name ?? '',
+        department: emp?.department ?? '',
+        position: (emp?.position ?? 'Entry A') as Position,
+        resignationDate: row.resignation_date as string,
+        reason: (row.reason as string) ?? '',
+        reasonDetail: (row.notes as string) || undefined,
+        ...statusBools,
+        createdAt: row.created_at as string,
+        updatedAt: row.updated_at as string,
+      };
+    });
+    setData(mapped);
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchResignations();
+  }, [fetchEmployees, fetchResignations]);
 
   // 퇴사일 기준 연도 목록 추출
   const availableYears = useMemo(() => {
@@ -102,7 +201,11 @@ export default function ResignationsPage() {
 
   function openCreate() {
     setEditTarget(null);
-    setForm(emptyForm);
+    setForm({
+      employeeId: '', employeeName: '', department: departments[0] ?? '', position: 'Entry A',
+      resignationDate: '', reason: '개인사유', reasonDetail: '',
+      handoverCompleted: false, assetReturned: false, accountDeactivated: false, severanceSettled: false,
+    });
     setIsModalOpen(true);
   }
 
@@ -129,23 +232,57 @@ export default function ResignationsPage() {
     if (emp) setForm((prev) => ({ ...prev, employeeId: emp.id, employeeName: emp.name, department: emp.department, position: emp.position }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.employeeName || !form.resignationDate) {
       alert('직원명과 퇴사일은 필수입니다.');
       return;
     }
-    const now = new Date().toISOString();
+
+    const statusJson = JSON.stringify({
+      handoverCompleted: form.handoverCompleted,
+      assetReturned: form.assetReturned,
+      accountDeactivated: form.accountDeactivated,
+      severanceSettled: form.severanceSettled,
+    });
+
     if (editTarget) {
-      setData((prev) => prev.map((r) => r.id === editTarget.id ? { ...r, ...form, reasonDetail: form.reasonDetail || undefined, updatedAt: now } : r));
+      const { error } = await supabase
+        .from('resignations')
+        .update({
+          employee_id: form.employeeId,
+          resignation_date: form.resignationDate,
+          reason: form.reason,
+          notes: form.reasonDetail || null,
+          status: statusJson,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editTarget.id);
+
+      if (error) {
+        console.error('Failed to update resignation:', error);
+        alert('수정에 실패했습니다.');
+        return;
+      }
     } else {
-      const newItem: Resignation = {
-        ...form, id: generateId('res'),
-        reasonDetail: form.reasonDetail || undefined,
-        createdAt: now, updatedAt: now,
-      };
-      setData((prev) => [...prev, newItem]);
+      const { error } = await supabase
+        .from('resignations')
+        .insert({
+          employee_id: form.employeeId,
+          resignation_date: form.resignationDate,
+          reason: form.reason,
+          notes: form.reasonDetail || null,
+          status: statusJson,
+        });
+
+      if (error) {
+        console.error('Failed to insert resignation:', error);
+        alert('등록에 실패했습니다.');
+        return;
+      }
     }
+
     setIsModalOpen(false);
+    await fetchResignations();
   }
 
   return (

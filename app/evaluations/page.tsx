@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, Plus, Pencil, ArrowUpCircle, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -9,10 +9,8 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { evaluations as initialData } from '@/data/evaluations';
-import { employees, departments } from '@/data/employees';
-import { personnelHistories } from '@/data/personnel-history';
-import { Evaluation, EvaluationGrade, Position } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { Evaluation, EvaluationGrade, Position, Employee, PersonnelHistory } from '@/types';
 import { paginate, generateId } from '@/lib/utils';
 import { exportToExcel } from '@/lib/export-excel';
 import { useAuth } from '@/components/AuthProvider';
@@ -44,59 +42,13 @@ function scoreColorClass(score: number) {
   return 'text-red-500';
 }
 
-// 직급체류기간 계산 (최근 승진일 기준, 없으면 입사일 기준)
-function getPositionTenure(employeeId: string): { years: number; startDate: string } {
-  const promotions = personnelHistories
-    .filter((h) => h.employeeId === employeeId && h.type === '승진')
-    .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
-
-  const emp = employees.find((e) => e.id === employeeId);
-  const startDate = promotions.length > 0 ? promotions[0].effectiveDate : (emp?.hireDate || '');
-  const start = new Date(startDate);
-  const now = new Date();
-  const years = Math.floor((now.getTime() - start.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-  return { years, startDate };
-}
-
-// 승진대상자 판별
-// Entry B → Entry A: 체류 3년 이상 + 최근 3개년 D 없음
-// Entry A → Junior: 체류 2년 이상 + 최근 2개년 D 없음
-// Junior → Senior: 체류 6년 이상 + 최근 3개년 A 1개 이상 + C 없음
+// 등급별 집계 / 승진 관련 헬퍼
 function getRecentGrades(employeeId: string, recentN: number, allData: Evaluation[]): EvaluationGrade[] {
   return allData
     .filter((e) => e.employeeId === employeeId)
     .sort((a, b) => b.year - a.year)
     .slice(0, recentN)
     .map((e) => e.grade);
-}
-
-function getPromotionEligibility(employeeId: string, allData: Evaluation[]): { eligible: boolean; nextPosition: string; reason?: string } | null {
-  const emp = employees.find((e) => e.id === employeeId);
-  if (!emp || emp.status === '퇴사') return null;
-
-  const { years } = getPositionTenure(employeeId);
-
-  if (emp.position === 'Entry B' && years >= 3) {
-    const grades = getRecentGrades(employeeId, 3, allData);
-    if (grades.length > 0 && !grades.includes('D')) {
-      return { eligible: true, nextPosition: 'Entry A' };
-    }
-  }
-  if (emp.position === 'Entry A' && years >= 2) {
-    const grades = getRecentGrades(employeeId, 2, allData);
-    if (grades.length > 0 && !grades.includes('D')) {
-      return { eligible: true, nextPosition: 'Junior' };
-    }
-  }
-  if (emp.position === 'Junior' && years >= 6) {
-    const grades = getRecentGrades(employeeId, 3, allData);
-    const hasAorAbove = grades.includes('A') || grades.includes('S');
-    const hasCorBelow = grades.includes('C') || grades.includes('D');
-    if (grades.length > 0 && hasAorAbove && !hasCorBelow) {
-      return { eligible: true, nextPosition: 'Senior' };
-    }
-  }
-  return null;
 }
 
 const PAGE_SIZE = 10;
@@ -123,7 +75,9 @@ const emptyForm: EvalForm = {
 export default function EvaluationsPage() {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
-  const [data, setData] = useState<Evaluation[]>(initialData);
+  const [data, setData] = useState<Evaluation[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [personnelHistories, setPersonnelHistories] = useState<PersonnelHistory[]>([]);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -133,6 +87,129 @@ export default function EvaluationsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Evaluation | null>(null);
   const [form, setForm] = useState<EvalForm>(emptyForm);
+
+  // Supabase에서 데이터 가져오기
+  const fetchData = useCallback(async () => {
+    const [evalRes, empRes, histRes] = await Promise.all([
+      supabase.from('evaluations').select('*'),
+      supabase.from('employees').select('*'),
+      supabase.from('personnel_histories').select('*'),
+    ]);
+
+    if (evalRes.data) {
+      setData(
+        evalRes.data.map((row: any) => ({
+          id: row.id,
+          employeeId: row.employee_id,
+          employeeName: row.employee_name,
+          department: row.department,
+          position: row.position,
+          year: row.year,
+          score: row.score,
+          grade: row.grade,
+          evaluatorName: row.evaluator_name,
+          comment: row.comment ?? undefined,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }))
+      );
+    }
+
+    if (empRes.data) {
+      setEmployees(
+        empRes.data.map((row: any) => ({
+          id: row.id,
+          employeeNumber: row.employee_number,
+          name: row.name,
+          department: row.department,
+          position: row.position,
+          jobTitle: row.job_title,
+          employmentType: row.employment_type,
+          hireDate: row.hire_date,
+          status: row.status,
+          phone: row.phone,
+          email: row.email,
+          birthDate: row.birth_date,
+          address: row.address,
+          profileImage: row.profile_image ?? undefined,
+          isProbation: row.is_probation,
+          probationEndDate: row.probation_end_date ?? undefined,
+          createdAt: row.created_at ?? '',
+          updatedAt: row.updated_at ?? '',
+        }))
+      );
+    }
+
+    if (histRes.data) {
+      setPersonnelHistories(
+        histRes.data.map((row: any) => ({
+          id: row.id,
+          employeeId: row.employee_id,
+          employeeName: row.employee_name ?? '',
+          type: row.type,
+          effectiveDate: row.effective_date,
+          details: row.notes ?? '',
+          previousValue: row.previous_value ?? undefined,
+          newValue: row.new_value ?? undefined,
+          registeredBy: '',
+          createdAt: row.created_at,
+        }))
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // departments를 employees에서 파생
+  const departments = useMemo(() => {
+    return Array.from(new Set(employees.map((e) => e.department))).sort();
+  }, [employees]);
+
+  // 직급체류기간 계산 (최근 승진일 기준, 없으면 입사일 기준)
+  const getPositionTenure = useCallback((employeeId: string): { years: number; startDate: string } => {
+    const promotions = personnelHistories
+      .filter((h) => h.employeeId === employeeId && h.type === '승진')
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
+
+    const emp = employees.find((e) => e.id === employeeId);
+    const startDate = promotions.length > 0 ? promotions[0].effectiveDate : (emp?.hireDate || '');
+    const start = new Date(startDate);
+    const now = new Date();
+    const years = Math.floor((now.getTime() - start.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    return { years, startDate };
+  }, [employees, personnelHistories]);
+
+  // 승진대상자 판별
+  const getPromotionEligibility = useCallback((employeeId: string, allData: Evaluation[]): { eligible: boolean; nextPosition: string; reason?: string } | null => {
+    const emp = employees.find((e) => e.id === employeeId);
+    if (!emp || emp.status === '퇴사') return null;
+
+    const { years } = getPositionTenure(employeeId);
+
+    if (emp.position === 'Entry B' && years >= 3) {
+      const grades = getRecentGrades(employeeId, 3, allData);
+      if (grades.length > 0 && !grades.includes('D')) {
+        return { eligible: true, nextPosition: 'Entry A' };
+      }
+    }
+    if (emp.position === 'Entry A' && years >= 2) {
+      const grades = getRecentGrades(employeeId, 2, allData);
+      if (grades.length > 0 && !grades.includes('D')) {
+        return { eligible: true, nextPosition: 'Junior' };
+      }
+    }
+    if (emp.position === 'Junior' && years >= 6) {
+      const grades = getRecentGrades(employeeId, 3, allData);
+      const hasAorAbove = grades.includes('A') || grades.includes('S');
+      const hasCorBelow = grades.includes('C') || grades.includes('D');
+      if (grades.length > 0 && hasAorAbove && !hasCorBelow) {
+        return { eligible: true, nextPosition: 'Senior' };
+      }
+    }
+    return null;
+  }, [employees, getPositionTenure]);
 
   const availableYears = useMemo(() => {
     const years = Array.from(new Set(data.map((e) => e.year)));
@@ -148,7 +225,7 @@ export default function EvaluationsPage() {
       const matchPromo = !promoFilter || getPromotionEligibility(e.employeeId, data) !== null;
       return matchSearch && matchDept && matchYear && matchGrade && matchPromo;
     });
-  }, [data, search, deptFilter, yearFilter, gradeFilter, promoFilter]);
+  }, [data, search, deptFilter, yearFilter, gradeFilter, promoFilter, getPromotionEligibility]);
 
   const sorted = [...filtered].sort((a, b) => b.year - a.year || a.employeeName.localeCompare(b.employeeName));
   const { data: pageData, totalPages } = paginate(sorted, page, PAGE_SIZE);
@@ -173,7 +250,7 @@ export default function EvaluationsPage() {
   const promotionCandidates = useMemo(() => {
     const uniqueEmployees = Array.from(new Set(data.map((e) => e.employeeId)));
     return uniqueEmployees.filter((id) => getPromotionEligibility(id, data) !== null).length;
-  }, [data]);
+  }, [data, getPromotionEligibility]);
 
   function openCreate() {
     setEditTarget(null);
@@ -208,26 +285,65 @@ export default function EvaluationsPage() {
     setForm((prev) => ({ ...prev, score: clamped }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.employeeName || !form.evaluatorName) {
       alert('직원명과 평가자는 필수입니다.');
       return;
     }
     const now = new Date().toISOString();
     const grade = scoreToGrade(form.score);
+
     if (editTarget) {
-      setData((prev) => prev.map((e) => e.id === editTarget.id ? {
-        ...e, ...form, grade, comment: form.comment || undefined, updatedAt: now,
-      } : e));
+      const { error } = await supabase
+        .from('evaluations')
+        .update({
+          employee_id: form.employeeId,
+          employee_name: form.employeeName,
+          department: form.department,
+          position: form.position,
+          year: form.year,
+          score: form.score,
+          grade,
+          evaluator_name: form.evaluatorName,
+          comment: form.comment || null,
+          updated_at: now,
+        })
+        .eq('id', editTarget.id);
+
+      if (!error) {
+        setData((prev) => prev.map((e) => e.id === editTarget.id ? {
+          ...e, ...form, grade, comment: form.comment || undefined, updatedAt: now,
+        } : e));
+      }
     } else {
-      const newItem: Evaluation = {
-        ...form,
-        id: generateId('eval'),
-        grade,
-        comment: form.comment || undefined,
-        createdAt: now, updatedAt: now,
-      };
-      setData((prev) => [...prev, newItem]);
+      const newId = generateId('eval');
+      const { error } = await supabase
+        .from('evaluations')
+        .insert({
+          id: newId,
+          employee_id: form.employeeId,
+          employee_name: form.employeeName,
+          department: form.department,
+          position: form.position,
+          year: form.year,
+          score: form.score,
+          grade,
+          evaluator_name: form.evaluatorName,
+          comment: form.comment || null,
+          created_at: now,
+          updated_at: now,
+        });
+
+      if (!error) {
+        const newItem: Evaluation = {
+          ...form,
+          id: newId,
+          grade,
+          comment: form.comment || undefined,
+          createdAt: now, updatedAt: now,
+        };
+        setData((prev) => [...prev, newItem]);
+      }
     }
     setIsModalOpen(false);
   }

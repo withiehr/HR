@@ -10,7 +10,6 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { departments } from '@/data/employees';
 import { Employee, EmploymentStatus, EmploymentType, Position } from '@/types';
 import { formatDate, paginate } from '@/lib/utils';
 import { useAuth } from '@/components/AuthProvider';
@@ -82,7 +81,7 @@ interface EmployeeForm {
 const emptyForm: EmployeeForm = {
   employeeNumber: '',
   name: '',
-  department: departments[0],
+  department: '',
   position: 'Entry A',
   jobTitle: '',
   employmentType: '정규직',
@@ -143,6 +142,10 @@ export default function EmployeesPage() {
     fetchEmployees();
     fetchPromotionDates();
   }, [fetchEmployees, fetchPromotionDates]);
+
+  const departments = useMemo(() => {
+    return Array.from(new Set(data.map((e) => e.department))).sort();
+  }, [data]);
 
   const filtered = useMemo(() => {
     return data.filter((e) => {

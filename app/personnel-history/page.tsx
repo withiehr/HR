@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, Plus, Pencil, Download } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -9,10 +9,9 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Pagination from '@/components/ui/Pagination';
 import EmptyState from '@/components/ui/EmptyState';
-import { personnelHistories as initialData } from '@/data/personnel-history';
-import { employees, departments } from '@/data/employees';
+import { supabase } from '@/lib/supabase';
 import { PersonnelHistory, PersonnelHistoryType } from '@/types';
-import { formatDate, paginate, generateId } from '@/lib/utils';
+import { formatDate, paginate } from '@/lib/utils';
 import { useAuth } from '@/components/AuthProvider';
 import { exportToExcel } from '@/lib/export-excel';
 
@@ -28,6 +27,15 @@ const historyBadgeVariant = (type: string) => {
 };
 
 const PAGE_SIZE = 10;
+
+interface EmployeeRow {
+  id: string;
+  employee_number: string;
+  name: string;
+  department: string;
+  position: string;
+  status: string;
+}
 
 interface HistoryForm {
   employeeId: string;
@@ -48,13 +56,65 @@ const emptyForm: HistoryForm = {
 export default function PersonnelHistoryPage() {
   const { role } = useAuth();
   const isAdmin = role === 'admin';
-  const [data, setData] = useState<PersonnelHistory[]>(initialData);
+  const [data, setData] = useState<PersonnelHistory[]>([]);
+  const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PersonnelHistory | null>(null);
   const [form, setForm] = useState<HistoryForm>(emptyForm);
+
+  const fetchEmployees = useCallback(async () => {
+    const { data: rows } = await supabase
+      .from('employees')
+      .select('id, employee_number, name, department, position, status');
+    if (rows) {
+      setEmployees(rows as EmployeeRow[]);
+    }
+  }, []);
+
+  const fetchHistories = useCallback(async () => {
+    const { data: rows } = await supabase
+      .from('personnel_histories')
+      .select('id, employee_id, type, effective_date, previous_value, new_value, notes, created_at');
+    if (rows) {
+      // Build a lookup map from employees state; fall back to a fresh fetch if needed
+      let empMap: Record<string, string> = {};
+      if (employees.length > 0) {
+        employees.forEach((e) => { empMap[e.id] = e.name; });
+      } else {
+        const { data: empRows } = await supabase
+          .from('employees')
+          .select('id, name');
+        if (empRows) {
+          (empRows as { id: string; name: string }[]).forEach((e) => { empMap[e.id] = e.name; });
+        }
+      }
+
+      const mapped: PersonnelHistory[] = rows.map((r: Record<string, unknown>) => ({
+        id: r.id as string,
+        employeeId: r.employee_id as string,
+        employeeName: empMap[r.employee_id as string] ?? '',
+        type: r.type as PersonnelHistoryType,
+        effectiveDate: r.effective_date as string,
+        details: (r.notes as string) ?? '',
+        previousValue: (r.previous_value as string) ?? undefined,
+        newValue: (r.new_value as string) ?? undefined,
+        registeredBy: '',
+        createdAt: r.created_at as string,
+      }));
+      setData(mapped);
+    }
+  }, [employees]);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
+
+  useEffect(() => {
+    fetchHistories();
+  }, [fetchHistories]);
 
   const filtered = useMemo(() => {
     return data.filter((h) => {
@@ -93,30 +153,49 @@ export default function PersonnelHistoryPage() {
     if (emp) setForm((prev) => ({ ...prev, employeeId: emp.id, employeeName: emp.name }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.employeeName || !form.effectiveDate) {
       alert('직원명과 발령일은 필수입니다.');
       return;
     }
+
     if (editTarget) {
-      setData((prev) =>
-        prev.map((h) => h.id === editTarget.id ? {
-          ...h, ...form,
-          previousValue: form.previousValue || undefined,
-          newValue: form.newValue || undefined,
-        } : h)
-      );
+      const { error } = await supabase
+        .from('personnel_histories')
+        .update({
+          employee_id: form.employeeId,
+          type: form.type,
+          effective_date: form.effectiveDate,
+          previous_value: form.previousValue || null,
+          new_value: form.newValue || null,
+          notes: form.details || null,
+        })
+        .eq('id', editTarget.id);
+
+      if (error) {
+        alert('수정에 실패했습니다: ' + error.message);
+        return;
+      }
     } else {
-      const newItem: PersonnelHistory = {
-        ...form,
-        id: generateId('ph'),
-        previousValue: form.previousValue || undefined,
-        newValue: form.newValue || undefined,
-        createdAt: new Date().toISOString(),
-      };
-      setData((prev) => [...prev, newItem]);
+      const { error } = await supabase
+        .from('personnel_histories')
+        .insert({
+          employee_id: form.employeeId,
+          type: form.type,
+          effective_date: form.effectiveDate,
+          previous_value: form.previousValue || null,
+          new_value: form.newValue || null,
+          notes: form.details || null,
+        });
+
+      if (error) {
+        alert('등록에 실패했습니다: ' + error.message);
+        return;
+      }
     }
+
     setIsModalOpen(false);
+    await fetchHistories();
   }
 
   return (
