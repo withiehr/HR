@@ -96,22 +96,27 @@ export default function EvaluationsPage() {
       supabase.from('personnel_histories').select('*'),
     ]);
 
-    if (evalRes.data) {
+    if (evalRes.data && empRes.data) {
+      const empLookup: Record<string, any> = {};
+      empRes.data.forEach((e: any) => { empLookup[e.id] = e; });
       setData(
-        evalRes.data.map((row: any) => ({
-          id: row.id,
-          employeeId: row.employee_id,
-          employeeName: row.employee_name,
-          department: row.department,
-          position: row.position,
-          year: row.year,
-          score: row.score,
-          grade: row.grade,
-          evaluatorName: row.evaluator_name,
-          comment: row.comment ?? undefined,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        }))
+        evalRes.data.map((row: any) => {
+          const emp = empLookup[row.employee_id] || {};
+          return {
+            id: row.id,
+            employeeId: row.employee_id,
+            employeeName: emp.name || '',
+            department: emp.department || '',
+            position: emp.position || '',
+            year: row.year,
+            score: row.score,
+            grade: row.grade,
+            evaluatorName: row.evaluator_name || '',
+            comment: row.comment ?? undefined,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          };
+        })
       );
     }
 
