@@ -18,7 +18,10 @@ import { useAuth } from '@/components/AuthProvider';
 const GRADES: EvaluationGrade[] = ['S', 'A', 'B', 'C', 'D'];
 const POSITIONS: Position[] = ['Entry B', 'Entry A', 'Junior', 'Senior'];
 
-// 점수 → 등급
+// 등급 → 점수
+const GRADE_TO_SCORE: Record<EvaluationGrade, number> = { S: 10, A: 9, B: 8, C: 7, D: 6 };
+
+// 평균 점수 → 등급
 function scoreToGrade(score: number): EvaluationGrade {
   if (score >= 9.5) return 'S';
   if (score >= 8.5) return 'A';
@@ -59,7 +62,7 @@ interface EvalForm {
   department: string;
   position: Position;
   year: number;
-  score: number;
+  grade: EvaluationGrade;
   evaluatorName: string;
   comment: string;
 }
@@ -68,7 +71,7 @@ const currentYear = new Date().getFullYear();
 
 const emptyForm: EvalForm = {
   employeeId: '', employeeName: '', department: '', position: 'Entry A',
-  year: currentYear, score: 8.0,
+  year: currentYear, grade: 'B',
   evaluatorName: '', comment: '',
 };
 
@@ -271,7 +274,7 @@ export default function EvaluationsPage() {
       department: ev.department,
       position: ev.position,
       year: ev.year,
-      score: ev.score,
+      grade: ev.grade,
       evaluatorName: ev.evaluatorName,
       comment: ev.comment || '',
     });
@@ -283,32 +286,22 @@ export default function EvaluationsPage() {
     if (emp) setForm((prev) => ({ ...prev, employeeId: emp.id, employeeName: emp.name, department: emp.department, position: emp.position }));
   }
 
-  function handleScoreChange(value: string) {
-    const num = parseFloat(value);
-    if (isNaN(num)) return;
-    const clamped = Math.round(Math.min(10.0, Math.max(6.0, num)) * 10) / 10;
-    setForm((prev) => ({ ...prev, score: clamped }));
-  }
-
   async function handleSubmit() {
     if (!form.employeeName || !form.evaluatorName) {
       alert('직원명과 평가자는 필수입니다.');
       return;
     }
     const now = new Date().toISOString();
-    const grade = scoreToGrade(form.score);
+    const score = GRADE_TO_SCORE[form.grade];
 
     if (editTarget) {
       const { error } = await supabase
         .from('evaluations')
         .update({
           employee_id: form.employeeId,
-          employee_name: form.employeeName,
-          department: form.department,
-          position: form.position,
           year: form.year,
-          score: form.score,
-          grade,
+          score,
+          grade: form.grade,
           evaluator_name: form.evaluatorName,
           comment: form.comment || null,
           updated_at: now,
@@ -317,22 +310,17 @@ export default function EvaluationsPage() {
 
       if (!error) {
         setData((prev) => prev.map((e) => e.id === editTarget.id ? {
-          ...e, ...form, grade, comment: form.comment || undefined, updatedAt: now,
+          ...e, ...form, score, grade: form.grade, comment: form.comment || undefined, updatedAt: now,
         } : e));
       }
     } else {
-      const newId = generateId('eval');
       const { error } = await supabase
         .from('evaluations')
         .insert({
-          id: newId,
           employee_id: form.employeeId,
-          employee_name: form.employeeName,
-          department: form.department,
-          position: form.position,
           year: form.year,
-          score: form.score,
-          grade,
+          score,
+          grade: form.grade,
           evaluator_name: form.evaluatorName,
           comment: form.comment || null,
           created_at: now,
@@ -342,8 +330,9 @@ export default function EvaluationsPage() {
       if (!error) {
         const newItem: Evaluation = {
           ...form,
-          id: newId,
-          grade,
+          id: 'temp-' + Date.now(),
+          score,
+          grade: form.grade,
           comment: form.comment || undefined,
           createdAt: now, updatedAt: now,
         };
@@ -375,7 +364,7 @@ export default function EvaluationsPage() {
             <div className="flex items-center justify-center gap-1.5 mt-1">
               {gradeBadge(grade)}
               <span className="text-xs text-gray-500">
-                {grade === 'S' ? '9.5~10.0' : grade === 'A' ? '8.5~9.4' : grade === 'B' ? '7.5~8.4' : grade === 'C' ? '6.5~7.4' : '6.0~6.4'}
+                {grade === 'S' ? '10점' : grade === 'A' ? '9점' : grade === 'B' ? '8점' : grade === 'C' ? '7점' : '6점'}
               </span>
             </div>
           </button>
@@ -563,38 +552,39 @@ export default function EvaluationsPage() {
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">평가 점수 (6.0 ~ 10.0)</label>
-              <input type="number" min={6.0} max={10.0} step={0.1} value={form.score}
-                onChange={(e) => handleScoreChange(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" />
+              <label className="text-sm font-medium text-gray-700">평가 등급</label>
+              <div className="grid grid-cols-5 gap-2">
+                {([
+                  { grade: 'S' as const, score: 10, color: 'emerald' },
+                  { grade: 'A' as const, score: 9, color: 'blue' },
+                  { grade: 'B' as const, score: 8, color: 'amber' },
+                  { grade: 'C' as const, score: 7, color: 'orange' },
+                  { grade: 'D' as const, score: 6, color: 'red' },
+                ]).map(({ grade, score, color }) => (
+                  <button key={grade} type="button"
+                    onClick={() => setForm({ ...form, grade })}
+                    className={`py-3 rounded-lg border-2 text-center transition-all ${
+                      form.grade === grade
+                        ? `border-${color}-500 bg-${color}-50 ring-1 ring-${color}-400`
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}>
+                    <div className={`text-lg font-bold text-${color}-600`}>{grade}</div>
+                    <div className="text-xs text-gray-500">{score}점</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">점수:</span>
-                <span className={`text-xl ${scoreColorClass(form.score)}`}>{form.score.toFixed(1)}</span>
+                <span className="text-sm text-gray-600">선택 등급:</span>
+                {gradeBadge(form.grade)}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600">등급:</span>
-                {gradeBadge(scoreToGrade(form.score))}
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <div className="grid grid-cols-5 gap-1 text-center text-xs">
-                {[
-                  { grade: 'S' as const, range: '9.5~10.0', color: 'text-emerald-600' },
-                  { grade: 'A' as const, range: '8.5~9.4', color: 'text-blue-600' },
-                  { grade: 'B' as const, range: '7.5~8.4', color: 'text-amber-600' },
-                  { grade: 'C' as const, range: '6.5~7.4', color: 'text-orange-500' },
-                  { grade: 'D' as const, range: '6.0~6.4', color: 'text-red-500' },
-                ].map(({ grade, range, color }) => (
-                  <div key={grade} className={`py-1.5 rounded ${scoreToGrade(form.score) === grade ? 'bg-blue-100 ring-1 ring-blue-400' : 'bg-white'}`}>
-                    <div className={`font-bold ${color}`}>{grade}</div>
-                    <div className="text-gray-400">{range}</div>
-                  </div>
-                ))}
+                <span className="text-sm text-gray-600">환산 점수:</span>
+                <span className={`text-xl font-bold ${scoreColorClass(GRADE_TO_SCORE[form.grade])}`}>{GRADE_TO_SCORE[form.grade]}점</span>
               </div>
             </div>
           </div>
