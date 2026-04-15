@@ -59,9 +59,9 @@ export default function Sidebar() {
         </div>
         {!collapsed && (
           <span className="text-sm font-semibold leading-tight">
-            인사관리 시스템
+            위드인천에너지
             <br />
-            <span className="text-xs text-slate-400 font-normal">위드인천에너지</span>
+            <span className="text-xs text-slate-400 font-normal">인사 시스템</span>
           </span>
         )}
       </div>

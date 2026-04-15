@@ -35,8 +35,9 @@ export default function LoginPage() {
             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
               <span className="text-white font-bold text-lg">HR</span>
             </div>
-            <h1 className="text-xl font-bold text-gray-900">인사관리 시스템</h1>
-            <p className="text-sm text-gray-500 mt-1">로그인하여 시작하세요</p>
+            <h1 className="text-xl font-bold text-gray-900">위드인천에너지 인사 시스템</h1>
+            <p className="text-sm text-gray-500 mt-1">등록된 이메일로 로그인하세요</p>
+            <p className="text-xs text-gray-400 mt-1">비밀번호는 아무 값이나 입력하세요</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

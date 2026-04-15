@@ -1,0 +1,29 @@
+[
+  {
+    "id": "dfba746f-e606-4436-af5e-ed50ffa8c686",
+    "email": "jheo2353@withie.co.kr",
+    "role": "admin",
+    "name": "어정호",
+    "status": "초대됨",
+    "last_login_at": null,
+    "created_at": "2026-04-15T03:49:23.492286+00:00"
+  },
+  {
+    "id": "bb62b2d6-ea7f-4c22-b12c-68c3f7844024",
+    "email": "admin@withie.co.kr",
+    "role": "admin",
+    "name": "관리자",
+    "status": "활성",
+    "last_login_at": "2026-04-15T03:55:07.966+00:00",
+    "created_at": "2026-03-10T00:14:33.143475+00:00"
+  },
+  {
+    "id": "59a50151-ec1f-4791-9bdf-5ff2fa8e978b",
+    "email": "hansol0325@withie.co.kr",
+    "role": "manager",
+    "name": "이한솔",
+    "status": "비활성",
+    "last_login_at": "2026-03-11T06:09:21.065+00:00",
+    "created_at": "2026-03-10T05:00:58.898779+00:00"
+  }
+]

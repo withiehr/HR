@@ -1,0 +1,152 @@
+[
+  {
+    "id": "201b070f-bc49-45df-b9d8-02173d78770c",
+    "timestamp": "2025-03-09T09:15:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "직원관리",
+    "action_type": "수정",
+    "target_name": "김민수",
+    "description": "연락처 정보 수정 (010-1234-5678)"
+  },
+  {
+    "id": "ffc222a4-a740-4c9d-bf41-24535964338b",
+    "timestamp": "2025-03-09T09:30:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "문서관리",
+    "action_type": "업로드",
+    "target_name": "문채원",
+    "description": "근로계약서 업로드 (문채원_근로계약서_2025.pdf)"
+  },
+  {
+    "id": "74363623-19c3-46db-a75e-3c53f3362ee6",
+    "timestamp": "2025-03-08T14:20:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "직원관리",
+    "action_type": "등록",
+    "target_name": "문채원",
+    "description": "신규 직원 등록 (경영지원팀/계약직)"
+  },
+  {
+    "id": "367420ea-bd53-48db-b03d-7bf5206467f5",
+    "timestamp": "2025-03-08T11:00:00+00:00",
+    "user_id": "user-002",
+    "user_name": "김민수",
+    "menu": "인사이력",
+    "action_type": "등록",
+    "target_name": "오승민",
+    "description": "포상 이력 등록 (2024 하반기 우수사원)"
+  },
+  {
+    "id": "de73099a-5307-4a51-9e1a-c3494196dc09",
+    "timestamp": "2025-03-07T16:45:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "자격증관리",
+    "action_type": "수정",
+    "target_name": "정현우",
+    "description": "전기공사기사 만료일 확인 및 상태 변경 (유효 → 만료예정)"
+  },
+  {
+    "id": "9e598cef-f615-4aff-8790-110026a19a13",
+    "timestamp": "2025-03-07T15:30:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "직원관리",
+    "action_type": "상태변경",
+    "target_name": "강예린",
+    "description": "재직상태 변경 (재직 → 휴직)"
+  },
+  {
+    "id": "c09b2955-d654-4d2d-95f4-ff61d2f5e70d",
+    "timestamp": "2025-03-06T10:00:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "인사이력",
+    "action_type": "등록",
+    "target_name": "강예린",
+    "description": "휴직 이력 등록 (육아휴직 2025.02~2025.07)"
+  },
+  {
+    "id": "75b5896c-f6db-44e9-83e5-c2155b3c29d5",
+    "timestamp": "2025-03-05T09:00:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "문서관리",
+    "action_type": "업로드",
+    "target_name": "강예린",
+    "description": "육아휴직 발령문서 업로드"
+  },
+  {
+    "id": "50830d08-e573-4525-9a7e-93648a36cc5f",
+    "timestamp": "2025-03-04T14:30:00+00:00",
+    "user_id": "user-002",
+    "user_name": "김민수",
+    "menu": "문서관리",
+    "action_type": "다운로드",
+    "target_name": "윤태호",
+    "description": "건축전기설비기술사 자격증 사본 다운로드"
+  },
+  {
+    "id": "8c620eca-2b24-4d24-89ae-68d64548bfa8",
+    "timestamp": "2025-03-03T11:20:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "직원관리",
+    "action_type": "등록",
+    "target_name": "신우진",
+    "description": "신규 직원 등록 (기술팀/정규직/수습)"
+  },
+  {
+    "id": "fcb9ed30-7313-4ffb-81be-8f094b85d9c1",
+    "timestamp": "2025-03-03T11:30:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "문서관리",
+    "action_type": "업로드",
+    "target_name": "신우진",
+    "description": "입사서류 및 근로계약서 업로드"
+  },
+  {
+    "id": "a46bf192-473e-4017-bb4f-810c6db34f40",
+    "timestamp": "2025-03-02T10:15:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "인사이력",
+    "action_type": "등록",
+    "target_name": "배진영",
+    "description": "승진 이력 등록 (대리 → 과장, 영업팀 팀장 발령)"
+  },
+  {
+    "id": "7856493c-064a-429d-9444-30f588bd7863",
+    "timestamp": "2025-03-01T09:00:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "자격증관리",
+    "action_type": "수정",
+    "target_name": "배진영",
+    "description": "전기기사 자격증 상태 변경 (유효 → 만료)"
+  },
+  {
+    "id": "1bb627bd-4dc9-4483-b3ee-93f4c6c6b50f",
+    "timestamp": "2025-02-28T16:00:00+00:00",
+    "user_id": "user-002",
+    "user_name": "김민수",
+    "menu": "퇴사관리",
+    "action_type": "조회",
+    "target_name": "송도현",
+    "description": "퇴사 처리 현황 조회"
+  },
+  {
+    "id": "ec665347-c525-4692-b9e4-eb01c325682c",
+    "timestamp": "2025-02-27T11:00:00+00:00",
+    "user_id": "user-001",
+    "user_name": "이서연",
+    "menu": "인사이력",
+    "action_type": "등록",
+    "target_name": "윤태호",
+    "description": "급여변경 이력 등록 (2025년 연봉계약 갱신)"
+  }
+]

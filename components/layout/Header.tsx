@@ -29,7 +29,7 @@ export default function Header() {
   if (!title && pathname.startsWith('/employees/')) {
     title = '직원 상세';
   }
-  title = title ?? '인사관리 시스템';
+  title = title ?? '위드인천에너지 인사 시스템';
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">

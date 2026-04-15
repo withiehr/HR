@@ -4,8 +4,8 @@ import AuthProvider from "@/components/AuthProvider";
 import AppShell from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "HR Management - 인사관리 시스템",
-  description: "사내 인사관리 웹 애플리케이션",
+  title: "위드인천에너지 인사 시스템",
+  description: "위드인천에너지 사내 인사관리 웹 애플리케이션",
 };
 
 export default function RootLayout({
