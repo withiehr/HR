@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+const IS_SUPABASE = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -36,8 +38,17 @@ export default function LoginPage() {
               <span className="text-white font-bold text-lg">HR</span>
             </div>
             <h1 className="text-xl font-bold text-gray-900">위드인천에너지 인사 시스템</h1>
-            <p className="text-sm text-gray-500 mt-1">등록된 이메일로 로그인하세요</p>
-            <p className="text-xs text-gray-400 mt-1">비밀번호는 아무 값이나 입력하세요</p>
+            {IS_SUPABASE ? (
+              <>
+                <p className="text-sm text-gray-500 mt-2">회사 메일 주소로 로그인하세요</p>
+                <p className="text-xs text-gray-400 mt-1">최초 로그인 시 관리자에게 권한을 요청하세요</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mt-1">등록된 이메일로 로그인하세요</p>
+                <p className="text-xs text-gray-400 mt-1">비밀번호는 아무 값이나 입력하세요</p>
+              </>
+            )}
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -47,7 +58,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@company.com"
+                placeholder="name@withie.co.kr"
                 required
                 className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
@@ -58,7 +69,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호 입력"
+                placeholder={IS_SUPABASE ? '비밀번호를 설정하지 않았다면 관리자에게 문의하세요' : '아무 값이나 입력'}
                 required
                 className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
