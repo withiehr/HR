@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { UserPlus, Mail, Shield, RefreshCw, Trash2 } from 'lucide-react';
+import { UserPlus, Mail, Shield, RefreshCw, Trash2, KeyRound } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
-import { supabase } from '@/lib/supabase';
+import { supabase, setPassword, getPassword } from '@/lib/supabase';
 import { useAuth } from '@/components/AuthProvider';
 import { formatDate, formatDateTime } from '@/lib/utils';
 
@@ -83,9 +83,13 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('viewer');
   const [inviteName, setInviteName] = useState('');
+  const [invitePassword, setInvitePassword] = useState('');
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [pwTarget, setPwTarget] = useState<AppUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -152,10 +156,16 @@ export default function AdminPage() {
         return;
       }
 
+      // 비밀번호 설정
+      if (invitePassword.trim()) {
+        setPassword(inviteEmail.trim(), invitePassword.trim());
+      }
+
       setSuccessMsg(`${inviteEmail.trim()} 사용자가 등록되었습니다.`);
       setInviteEmail('');
       setInviteRole('viewer');
       setInviteName('');
+      setInvitePassword('');
       setInviteOpen(false);
       fetchUsers();
     } catch (err) {
@@ -174,6 +184,23 @@ export default function AdminPage() {
     } else {
       fetchUsers();
     }
+  }
+
+  function openPasswordModal(u: AppUser) {
+    setPwTarget(u);
+    setNewPassword(getPassword(u.email));
+    setPwModalOpen(true);
+  }
+
+  function handlePasswordSave() {
+    if (!pwTarget) return;
+    if (!newPassword.trim()) {
+      alert('비밀번호를 입력해주세요.');
+      return;
+    }
+    setPassword(pwTarget.email, newPassword.trim());
+    setPwModalOpen(false);
+    setSuccessMsg(`${pwTarget.email}의 비밀번호가 변경되었습니다.`);
   }
 
   async function handleToggleStatus(userId: string, currentStatus: string) {
@@ -291,6 +318,13 @@ export default function AdminPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
                         <button
+                          onClick={() => openPasswordModal(u)}
+                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+                          title="비밀번호 변경"
+                        >
+                          <KeyRound size={14} />
+                        </button>
+                        <button
                           onClick={() => handleToggleStatus(u.id, u.status)}
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                           title={u.status === '비활성' ? '활성화' : '비활성화'}
@@ -343,6 +377,14 @@ export default function AdminPage() {
             onChange={(e) => setInviteRole(e.target.value)}
           />
 
+          <Input
+            label="초기 비밀번호"
+            type="password"
+            placeholder="비밀번호 입력"
+            value={invitePassword}
+            onChange={(e) => setInvitePassword(e.target.value)}
+          />
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">
               {error}
@@ -356,6 +398,33 @@ export default function AdminPage() {
             <Button onClick={handleInvite} disabled={inviting}>
               <Mail size={14} />
               {inviting ? '등록 중...' : '사용자 등록'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 비밀번호 변경 모달 */}
+      <Modal isOpen={pwModalOpen} onClose={() => setPwModalOpen(false)} title="비밀번호 변경" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            <span className="font-medium text-gray-900">{pwTarget?.email}</span>의 비밀번호를 변경합니다.
+          </p>
+
+          <Input
+            label="새 비밀번호"
+            type="password"
+            placeholder="새 비밀번호 입력"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setPwModalOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handlePasswordSave}>
+              <KeyRound size={14} />
+              비밀번호 저장
             </Button>
           </div>
         </div>
