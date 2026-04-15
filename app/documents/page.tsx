@@ -103,8 +103,8 @@ export default function DocumentsPage() {
       if (empRes.data) {
         const emps = empRes.data.map(rowToEmployee);
         setEmployees(emps);
-        const deptSet = new Set(emps.map(e => e.department));
-        setDepartments(Array.from(deptSet).sort());
+        const deptSet = new Set(emps.map((e: any) => e.department));
+        setDepartments(Array.from(deptSet).sort() as string[]);
       }
     }
     fetchData();

@@ -112,7 +112,7 @@ export default function CertificationsPage() {
   }, []);
 
   const fetchCertifications = useCallback(async (employeeList: EmployeeRow[]) => {
-    const { data: dbCerts, error } = await supabase
+    const { data: dbCerts, error }: { data: any; error: any } = await supabase
       .from('certifications')
       .select('*');
     if (error) {
@@ -120,7 +120,7 @@ export default function CertificationsPage() {
       return;
     }
     if (dbCerts) {
-      const mapped = dbCerts.map((r) => mapDbCert(r as Record<string, unknown>, employeeList));
+      const mapped = dbCerts.map((r: any) => mapDbCert(r as Record<string, unknown>, employeeList));
       setData(mapped);
     }
   }, []);

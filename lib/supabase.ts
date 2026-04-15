@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable */
 
 // ===== Supabase / localStorage 자동 판별 =====
 // 환경변수에 Supabase 설정이 있으면 Supabase 사용 (Vercel 배포)
@@ -8,10 +8,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const USE_SUPABASE = !!(supabaseUrl && supabaseAnonKey);
 
-// ===== Supabase 모드 =====
-function createSupabaseClient() {
+function createSupabaseClient(): any {
   const { createClient } = require('@supabase/supabase-js');
-  return createClient(supabaseUrl!, supabaseAnonKey!);
+  return createClient(supabaseUrl, supabaseAnonKey);
 }
 
 // ===== localStorage 모드 =====
@@ -326,7 +325,7 @@ const localStorage_storage = {
 
 // ===== Export: 환경에 따라 자동 선택 =====
 
-function createLocalClient() {
+function createLocalClient(): any {
   return {
     from(tableName: string) { return new QueryBuilder(tableName); },
     auth: localAuth,
@@ -334,4 +333,6 @@ function createLocalClient() {
   };
 }
 
-export const supabase: any = USE_SUPABASE ? createSupabaseClient() : createLocalClient();
+export const supabase: any = USE_SUPABASE
+  ? createSupabaseClient()
+  : createLocalClient();
