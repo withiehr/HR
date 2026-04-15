@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export default function SetPasswordPage() {
   const router = useRouter();
@@ -9,6 +10,28 @@ export default function SetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    async function handleTokenFromHash() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token')) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const { data: { session: newSession } } = await supabase.auth.getSession();
+          if (!newSession) {
+            setError('인증 세션이 만료되었습니다. 초대 메일을 다시 요청해주세요.');
+          }
+        }
+      }
+
+      setChecking(false);
+    }
+
+    handleTokenFromHash();
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,9 +48,41 @@ export default function SetPasswordPage() {
     }
 
     setLoading(true);
-    // 로컬 모드: 비밀번호 설정 없이 바로 대시보드로 이동
-    router.push('/dashboard');
-    router.refresh();
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
+
+      if (updateError) {
+        setError(`비밀번호 설정 실패: ${updateError.message}`);
+        setLoading(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        await supabase
+          .from('app_users')
+          .update({ status: '활성' })
+          .eq('email', user.email);
+      }
+
+      router.push('/dashboard');
+      router.refresh();
+    } catch {
+      setError('비밀번호 설정 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-400 text-sm">인증 확인 중...</div>
+      </div>
+    );
   }
 
   return (
@@ -39,9 +94,7 @@ export default function SetPasswordPage() {
               <span className="text-white font-bold text-lg">HR</span>
             </div>
             <h1 className="text-xl font-bold text-gray-900">비밀번호 설정</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              로그인에 사용할 비밀번호를 설정해주세요
-            </p>
+            <p className="text-sm text-gray-500 mt-1">로그인에 사용할 비밀번호를 설정해주세요</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

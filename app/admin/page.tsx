@@ -138,21 +138,35 @@ export default function AdminPage() {
     setError('');
 
     try {
-      // app_users 테이블에 레코드 추가 (로컬 모드: 바로 활성 상태로 등록)
-      const { error: insertError } = await supabase.from('app_users').insert({
+      // 1. Magic link 발송 (Supabase 모드에서만 실제 발송)
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email: inviteEmail.trim(),
-        role: inviteRole,
-        name: inviteName.trim(),
-        status: '활성',
+        options: {
+          shouldCreateUser: true,
+        },
       });
 
-      if (insertError) {
-        setError(`사용자 등록 실패: ${insertError.message}`);
+      if (otpError) {
+        setError(`초대 메일 발송 실패: ${otpError.message}`);
         setInviting(false);
         return;
       }
 
-      setSuccessMsg(`${inviteEmail.trim()} 사용자가 등록되었습니다. 해당 이메일로 로그인할 수 있습니다.`);
+      // 2. app_users 테이블에 레코드 추가
+      const { error: insertError } = await supabase.from('app_users').insert({
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        name: inviteName.trim(),
+        status: '초대됨',
+      });
+
+      if (insertError) {
+        setError(`사용자 기록 저장 실패: ${insertError.message}`);
+        setInviting(false);
+        return;
+      }
+
+      setSuccessMsg(`${inviteEmail.trim()} 으로 초대 메일이 발송되었습니다.`);
       setInviteEmail('');
       setInviteRole('viewer');
       setInviteName('');
@@ -318,7 +332,7 @@ export default function AdminPage() {
       <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="사용자 초대" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-500">
-            사용자를 등록하면 해당 이메일로 바로 로그인할 수 있습니다.
+            입력한 이메일로 초대 메일이 발송됩니다.
           </p>
 
           <Input
@@ -355,7 +369,7 @@ export default function AdminPage() {
             </Button>
             <Button onClick={handleInvite} disabled={inviting}>
               <Mail size={14} />
-              {inviting ? '등록 중...' : '사용자 등록'}
+              {inviting ? '발송 중...' : '초대 메일 발송'}
             </Button>
           </div>
         </div>
