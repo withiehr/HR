@@ -2,8 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import { Bell, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': '대시보드',
@@ -18,13 +19,71 @@ const pageTitles: Record<string, string> = {
   '/admin': '관리자',
 };
 
+interface NotifItem {
+  id: string;
+  title: string;
+  detail: string;
+}
+
 export default function Header() {
   const pathname = usePathname();
   const { user, role, signOut } = useAuth();
   const ROLE_LABELS: Record<string, string> = { admin: '관리자', manager: '매니저', viewer: '뷰어' };
   const [showNotif, setShowNotif] = useState(false);
+  const [notifications, setNotifications] = useState<NotifItem[]>([]);
 
-  // 직원 상세 페이지 제목 처리
+  useEffect(() => {
+    async function loadNotifications() {
+      const items: NotifItem[] = [];
+
+      // 만료예정 자격증
+      const { data: certs } = await supabase
+        .from('certifications')
+        .select('*, employees(name)');
+      if (certs) {
+        certs.forEach((c: any) => {
+          if (c.expiry_date && (c.status === '만료예정' || c.status === '유효')) {
+            const expiry = new Date(c.expiry_date);
+            const now = new Date();
+            const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysLeft > 0 && daysLeft <= 90) {
+              const empName = c.employees?.name || '';
+              items.push({
+                id: 'cert-' + c.id,
+                title: '자격증 만료 예정',
+                detail: `${empName} - ${c.name || c.certification_name} (${c.expiry_date})`,
+              });
+            }
+          }
+        });
+      }
+
+      // 수습 종료 예정 직원
+      const { data: emps } = await supabase
+        .from('employees')
+        .select('*');
+      if (emps) {
+        emps.forEach((e: any) => {
+          if (e.is_probation && e.probation_end_date) {
+            const endDate = new Date(e.probation_end_date);
+            const now = new Date();
+            const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysLeft > 0 && daysLeft <= 90) {
+              items.push({
+                id: 'prob-' + e.id,
+                title: '수습 종료 예정',
+                detail: `${e.name} - 수습 종료일: ${e.probation_end_date}`,
+              });
+            }
+          }
+        });
+      }
+
+      setNotifications(items);
+    }
+    loadNotifications();
+  }, []);
+
   let title = pageTitles[pathname];
   if (!title && pathname.startsWith('/employees/')) {
     title = '직원 상세';
@@ -43,23 +102,23 @@ export default function Header() {
             className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            {notifications.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+            )}
           </button>
           {showNotif && (
             <div className="absolute right-0 top-full mt-1 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-2">
               <p className="px-4 py-2 text-sm font-medium text-gray-900 border-b">알림</p>
-              <div className="px-4 py-3 text-sm text-gray-600 border-b hover:bg-gray-50">
-                <p className="font-medium text-gray-800">자격증 만료 예정</p>
-                <p className="text-xs text-gray-500 mt-0.5">정현우 - 전기공사기사 (2025.05.10)</p>
-              </div>
-              <div className="px-4 py-3 text-sm text-gray-600 border-b hover:bg-gray-50">
-                <p className="font-medium text-gray-800">수습 종료 예정</p>
-                <p className="text-xs text-gray-500 mt-0.5">신우진 - 수습 종료일: 2025.04.05</p>
-              </div>
-              <div className="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50">
-                <p className="font-medium text-gray-800">자격증 만료 예정</p>
-                <p className="text-xs text-gray-500 mt-0.5">김민수 - 에너지관리기사 (2026.04.15)</p>
-              </div>
+              {notifications.length === 0 ? (
+                <p className="px-4 py-4 text-sm text-gray-400 text-center">알림이 없습니다</p>
+              ) : (
+                notifications.map((n) => (
+                  <div key={n.id} className="px-4 py-3 text-sm text-gray-600 border-b last:border-0 hover:bg-gray-50">
+                    <p className="font-medium text-gray-800">{n.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{n.detail}</p>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
