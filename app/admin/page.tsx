@@ -138,35 +138,21 @@ export default function AdminPage() {
     setError('');
 
     try {
-      // 1. Magic link 발송 (Supabase 모드에서만 실제 발송)
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: inviteEmail.trim(),
-        options: {
-          shouldCreateUser: true,
-        },
-      });
-
-      if (otpError) {
-        setError(`초대 메일 발송 실패: ${otpError.message}`);
-        setInviting(false);
-        return;
-      }
-
-      // 2. app_users 테이블에 레코드 추가
+      // app_users 테이블에 바로 등록
       const { error: insertError } = await supabase.from('app_users').insert({
         email: inviteEmail.trim(),
         role: inviteRole,
         name: inviteName.trim(),
-        status: '초대됨',
+        status: '활성',
       });
 
       if (insertError) {
-        setError(`사용자 기록 저장 실패: ${insertError.message}`);
+        setError(`사용자 등록 실패: ${insertError.message}`);
         setInviting(false);
         return;
       }
 
-      setSuccessMsg(`${inviteEmail.trim()} 으로 초대 메일이 발송되었습니다.`);
+      setSuccessMsg(`${inviteEmail.trim()} 사용자가 등록되었습니다.`);
       setInviteEmail('');
       setInviteRole('viewer');
       setInviteName('');
@@ -332,7 +318,7 @@ export default function AdminPage() {
       <Modal isOpen={inviteOpen} onClose={() => setInviteOpen(false)} title="사용자 초대" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-500">
-            입력한 이메일로 초대 메일이 발송됩니다.
+            등록된 이메일로 로그인할 수 있습니다.
           </p>
 
           <Input
@@ -369,7 +355,7 @@ export default function AdminPage() {
             </Button>
             <Button onClick={handleInvite} disabled={inviting}>
               <Mail size={14} />
-              {inviting ? '발송 중...' : '초대 메일 발송'}
+              {inviting ? '등록 중...' : '사용자 등록'}
             </Button>
           </div>
         </div>
