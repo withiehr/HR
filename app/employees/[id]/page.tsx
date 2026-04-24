@@ -348,115 +348,180 @@ export default function EmployeeDetailPage() {
     const { default: html2canvas } = await import('html2canvas-pro');
     const { default: jsPDF } = await import('jspdf');
 
+    // 나이 계산
+    const age = (() => {
+      if (!employee.birthDate) return '';
+      const b = new Date(employee.birthDate);
+      const now = new Date();
+      let a = now.getFullYear() - b.getFullYear();
+      if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--;
+      return `(만${a}세)`;
+    })();
+
+    // 근속년수 계산
+    const serviceYears = (() => {
+      if (!employee.hireDate) return '';
+      const h = new Date(employee.hireDate);
+      const now = new Date();
+      const years = Math.floor((now.getTime() - h.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      return `${years}년`;
+    })();
+
+    // 테이블 스타일 통일
+    const cellStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;color:#1e293b;';
+    const labelStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;background:#e0e7ff;color:#1e293b;font-weight:600;width:80px;';
+    const sectionHeaderStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;background:#e0e7ff;color:#1e40af;font-weight:700;';
+    const thStyle = 'padding:6px 10px;border:1px solid #cbd5e1;font-size:11px;background:#f1f5f9;color:#334155;font-weight:600;text-align:center;';
+    const tdStyle = 'padding:6px 10px;border:1px solid #cbd5e1;font-size:11px;color:#1e293b;';
+    const tdCenterStyle = tdStyle + 'text-align:center;';
+
+    // 경력사항
+    const careerRows = careers.length > 0
+      ? careers.map(c =>
+          `<tr><td style="${tdStyle}">${c.companyName}</td><td style="${tdCenterStyle}">${c.position || ''}</td><td style="${tdCenterStyle}">${formatDate(c.startDate)} ~ ${formatDate(c.endDate)}</td><td style="${tdStyle}">${c.description || ''}</td></tr>`
+        ).join('')
+      : `<tr><td colspan="4" style="${tdCenterStyle}color:#94a3b8;">경력사항 없음</td></tr>`;
+
+    // 자격증
+    const certRows = empCerts.length > 0
+      ? empCerts.map(c =>
+          `<tr><td style="${tdStyle}">${c.certificationName}</td><td style="${tdCenterStyle}">${c.issuingOrganization || ''}</td><td style="${tdCenterStyle}">${formatDate(c.acquiredDate)}</td></tr>`
+        ).join('')
+      : `<tr><td colspan="3" style="${tdCenterStyle}color:#94a3b8;">자격증 없음</td></tr>`;
+
+    // 인사평가 (최근 5건)
+    const recentEvals = [...evaluations].sort((a, b) => b.year - a.year).slice(0, 5);
+    const evalRows = recentEvals.length > 0
+      ? recentEvals.map(ev =>
+          `<tr><td style="${tdCenterStyle}">${ev.year}년</td><td style="${tdCenterStyle}font-weight:600;">${ev.score}</td><td style="${tdCenterStyle}font-weight:600;">${ev.grade}</td></tr>`
+        ).join('')
+      : `<tr><td colspan="3" style="${tdCenterStyle}color:#94a3b8;">인사평가 없음</td></tr>`;
+
+    // 인사이력 (최근 10건)
+    const recentHistories = [...empHistories]
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+      .slice(0, 10);
+    const historyRows = recentHistories.length > 0
+      ? recentHistories.map(h =>
+          `<tr><td style="${tdCenterStyle}">${formatDate(h.effectiveDate)}</td><td style="${tdCenterStyle}">${h.type}</td><td style="${tdStyle}">${h.details || ''}</td></tr>`
+        ).join('')
+      : `<tr><td colspan="3" style="${tdCenterStyle}color:#94a3b8;">인사이력 없음</td></tr>`;
+
+    // 프로필 이미지
+    const photoHtml = employee.profileImage
+      ? `<img src="${employee.profileImage}" style="width:100%;height:100%;object-fit:cover;" crossorigin="anonymous" />`
+      : `<div style="width:100%;height:100%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">사진</div>`;
+
     // PDF 전용 숨겨진 HTML 생성
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;background:#fff;padding:40px;font-family:system-ui,-apple-system,sans-serif;';
-
-    const certRows = empCerts.map(c =>
-      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.certificationName}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.category}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.issuingOrganization}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(c.acquiredDate)}</td></tr>`
-    ).join('');
-
-    const historyRows = empHistories.slice(0, 10).map(h =>
-      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(h.effectiveDate)}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${h.type}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${h.details}</td></tr>`
-    ).join('');
-
-    const careerRows = careers.map(c =>
-      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.companyName}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.position}</td><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatDate(c.startDate)} ~ ${formatDate(c.endDate)}</td></tr>`
-    ).join('');
+    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;background:#fff;padding:40px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
 
     container.innerHTML = `
-      <div style="text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #1e40af;">
-        <h1 style="font-size:24px;font-weight:700;color:#1e293b;margin:0;">직원 상세 정보</h1>
+      <!-- 제목 -->
+      <div style="text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #1e293b;">
+        <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0;letter-spacing:12px;">인 사 기 록 카 드</h1>
       </div>
 
-      <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
-        ${employee.profileImage
-          ? `<img src="${employee.profileImage}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb;" crossorigin="anonymous" />`
-          : `<div style="width:80px;height:80px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;"><span style="font-size:28px;font-weight:700;color:#fff;">${employee.name.charAt(0)}</span></div>`
-        }
-        <div>
-          <h2 style="font-size:20px;font-weight:700;color:#1e293b;margin:0;">${employee.name} <span style="font-size:14px;font-weight:400;color:#64748b;">(만 ${(() => { const b = new Date(employee.birthDate); const now = new Date(); let age = now.getFullYear() - b.getFullYear(); if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--; return age; })()}세)</span></h2>
-          <p style="font-size:13px;color:#64748b;margin:4px 0 0;">${employee.employeeNumber} · ${employee.department} · ${employee.position} (${positionYears}년차)</p>
-        </div>
-      </div>
+      <!-- 기본정보 (사진 + 인적사항) -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+        <tr>
+          <td rowspan="5" style="border:1px solid #cbd5e1;width:110px;height:160px;padding:0;text-align:center;vertical-align:middle;">
+            ${photoHtml}
+          </td>
+          <td style="${labelStyle}">성명</td>
+          <td style="${cellStyle}width:220px;">${employee.name} ${age}</td>
+          <td style="${labelStyle}">사번</td>
+          <td style="${cellStyle}width:140px;">${employee.employeeNumber}</td>
+          <td style="${labelStyle}">부서</td>
+          <td style="${cellStyle}">${employee.department}</td>
+        </tr>
+        <tr>
+          <td style="${labelStyle}">생년월일</td>
+          <td style="${cellStyle}">${formatDate(employee.birthDate)}</td>
+          <td style="${labelStyle}">직급</td>
+          <td style="${cellStyle}">${employee.position}</td>
+          <td style="${labelStyle}">직책</td>
+          <td style="${cellStyle}">${employee.jobTitle || '-'}</td>
+        </tr>
+        <tr>
+          <td style="${labelStyle}">입사일</td>
+          <td style="${cellStyle}">${formatDate(employee.hireDate)}</td>
+          <td style="${labelStyle}">근속</td>
+          <td style="${cellStyle}">${serviceYears}</td>
+          <td style="${labelStyle}">고용형태</td>
+          <td style="${cellStyle}">${employee.employmentType}</td>
+        </tr>
+        <tr>
+          <td style="${labelStyle}">연락처</td>
+          <td style="${cellStyle}">${employee.phone || '-'}</td>
+          <td style="${labelStyle}">이메일</td>
+          <td colspan="3" style="${cellStyle}">${employee.email || '-'}</td>
+        </tr>
+        <tr>
+          <td style="${labelStyle}">주소</td>
+          <td colspan="5" style="${cellStyle}">${employee.address || '-'}</td>
+        </tr>
+      </table>
 
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
-        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 16px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">기본 정보</h3>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;width:80px;">사번</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;width:200px;">${employee.employeeNumber}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;width:80px;">이름</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.name}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">부서</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.department}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">직급</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.position} (${positionYears}년차 · ${formatDate(positionStartDate)}~)</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">직책</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.jobTitle || '-'}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">고용형태</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.employmentType}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">입사일</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${formatDate(employee.hireDate)}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">재직상태</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.status}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">생년월일</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${formatDate(employee.birthDate)}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">연락처</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.phone || '-'}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">이메일</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.email || '-'}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">주소</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.address || '-'}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">최종학력</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.educationLevel || '-'}</td>
-            <td style="padding:6px 0;font-size:12px;color:#94a3b8;">학교/학과</td>
-            <td style="padding:6px 0;font-size:13px;color:#334155;">${employee.schoolName || '-'}${employee.major ? ' / ' + employee.major : ''}</td>
-          </tr>
-        </table>
-      </div>
+      <!-- 학력 -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+        <tr><td colspan="4" style="${sectionHeaderStyle}">학력</td></tr>
+        <tr>
+          <td style="${labelStyle}">최종학력</td>
+          <td style="${cellStyle}width:200px;">${employee.educationLevel || '-'}</td>
+          <td style="${labelStyle}">학교</td>
+          <td style="${cellStyle}">${employee.schoolName || '-'}${employee.major ? ' / ' + employee.major : ''}</td>
+        </tr>
+      </table>
 
-      ${empCerts.length > 0 ? `
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
-        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">자격증</h3>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">자격증명</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">분류</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">발급기관</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">취득일</th></tr>
-          ${certRows}
-        </table>
-      </div>` : ''}
+      <!-- 경력사항 -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+        <tr><td colspan="4" style="${sectionHeaderStyle}">경력사항 (${careers.length}건)</td></tr>
+        <tr>
+          <th style="${thStyle}">회사명</th>
+          <th style="${thStyle}width:120px;">직위</th>
+          <th style="${thStyle}width:200px;">근무기간</th>
+          <th style="${thStyle}">주요업무</th>
+        </tr>
+        ${careerRows}
+      </table>
 
-      ${careers.length > 0 ? `
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
-        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">경력사항</h3>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">회사명</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">직위</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">기간</th></tr>
-          ${careerRows}
-        </table>
-      </div>` : ''}
+      <!-- 자격증 -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+        <tr><td colspan="3" style="${sectionHeaderStyle}">자격증 (${empCerts.length}건)</td></tr>
+        <tr>
+          <th style="${thStyle}">자격증명</th>
+          <th style="${thStyle}">발급기관</th>
+          <th style="${thStyle}width:120px;">취득일</th>
+        </tr>
+        ${certRows}
+      </table>
 
-      ${empHistories.length > 0 ? `
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:24px;">
-        <h3 style="font-size:14px;font-weight:600;color:#1e293b;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #e2e8f0;">인사이력</h3>
-        <table style="width:100%;border-collapse:collapse;">
-          <tr style="background:#f1f5f9;"><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">일자</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">구분</th><th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#475569;">내용</th></tr>
-          ${historyRows}
-        </table>
-      </div>` : ''}
+      <!-- 인사평가 (최근 5건) -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+        <tr><td colspan="3" style="${sectionHeaderStyle}">인사평가 (최근 5건)</td></tr>
+        <tr>
+          <th style="${thStyle}">연도</th>
+          <th style="${thStyle}">점수</th>
+          <th style="${thStyle}">등급</th>
+        </tr>
+        ${evalRows}
+      </table>
 
-      <div style="text-align:center;padding-top:16px;border-top:1px solid #e2e8f0;">
-        <p style="font-size:11px;color:#94a3b8;">위드인천에너지(주) 인사관리시스템</p>
+      <!-- 인사이력 (최근 10건) -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
+        <tr><td colspan="3" style="${sectionHeaderStyle}">인사이력 (최근 10건)</td></tr>
+        <tr>
+          <th style="${thStyle}width:120px;">일자</th>
+          <th style="${thStyle}width:100px;">구분</th>
+          <th style="${thStyle}">내용</th>
+        </tr>
+        ${historyRows}
+      </table>
+
+      <!-- 푸터 -->
+      <div style="text-align:center;margin-top:40px;">
+        <p style="font-size:13px;font-weight:600;color:#1e293b;margin:0;">위드인천에너지주식회사</p>
       </div>
     `;
 
@@ -489,7 +554,7 @@ export default function EmployeeDetailPage() {
       pdf.addImage(imgData, 'PNG', 0, -(i * pageHeight), pdfWidth, pdfHeight);
     }
 
-    pdf.save(`${employee.name}_직원상세.pdf`);
+    pdf.save(`${employee.name}_인사기록카드.pdf`);
   };
 
   const openCareerModal = (career?: CareerHistory) => {
