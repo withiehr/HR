@@ -413,9 +413,9 @@ export default function EmployeeDetailPage() {
       : `<div style="width:100%;height:100%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">사진</div>`;
 
     // PDF 전용 숨겨진 HTML 생성 (A4: 210mm × 297mm, 96dpi 기준 794×1123px)
-    // A4 한 페이지 전체 높이 사용, 푸터는 바닥에 고정
+    // A4 한 페이지 전체 높이 사용, 푸터는 absolute로 바닥에 고정
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;min-height:1123px;box-sizing:border-box;background:#fff;padding:30px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;display:flex;flex-direction:column;';
+    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1123px;box-sizing:border-box;background:#fff;padding:30px 30px 80px 30px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
 
     container.innerHTML = `
       <!-- 제목 -->
@@ -551,9 +551,9 @@ export default function EmployeeDetailPage() {
         ${historyRows}
       </table>
 
-      <!-- 푸터: 페이지 하단 중앙 고정 -->
-      <div style="width:100%;margin-top:auto;padding-top:30px;display:flex;justify-content:center;align-items:center;">
-        <img src="/logo.png" style="height:45px;display:block;" crossorigin="anonymous" />
+      <!-- 푸터: A4 페이지 맨 밑 정중앙 -->
+      <div style="position:absolute;bottom:25px;left:0;right:0;text-align:center;">
+        <img src="/logo.png" style="height:45px;" crossorigin="anonymous" />
       </div>
     `;
 
