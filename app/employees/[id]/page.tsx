@@ -553,7 +553,7 @@ export default function EmployeeDetailPage() {
 
       <!-- 푸터 -->
       <div style="text-align:center;margin-top:40px;">
-        <p style="font-size:13px;font-weight:600;color:#1e293b;margin:0;">위드인천에너지주식회사</p>
+        <img src="/logo.png" style="height:45px;vertical-align:middle;" crossorigin="anonymous" />
       </div>
     `;
 
