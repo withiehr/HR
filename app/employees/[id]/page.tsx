@@ -415,10 +415,9 @@ export default function EmployeeDetailPage() {
     // PDF 전용 숨겨진 HTML 생성 (A4: 210mm × 297mm, 96dpi 기준 794×1123px)
     // A4 한 페이지 전체 높이 사용, 푸터는 absolute로 바닥에 고정
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;height:1123px;box-sizing:border-box;background:#fff;padding:30px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
+    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;box-sizing:border-box;background:#fff;padding:30px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
 
     container.innerHTML = `
-    <div style="position:relative;width:100%;height:100%;box-sizing:border-box;">
       <!-- 제목 -->
       <div style="text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #1e293b;">
         <h1 style="font-size:22px;font-weight:700;color:#1e293b;margin:0;letter-spacing:12px;">인 사 기 록 카 드</h1>
@@ -552,11 +551,6 @@ export default function EmployeeDetailPage() {
         ${historyRows}
       </table>
 
-      <!-- 푸터: A4 페이지 맨 밑 정중앙 -->
-      <div style="position:absolute;bottom:0;left:0;right:0;text-align:center;">
-        <img src="/logo.png" style="height:45px;" crossorigin="anonymous" />
-      </div>
-    </div>
     `;
 
     document.body.appendChild(container);
@@ -580,19 +574,39 @@ export default function EmployeeDetailPage() {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();      // 210mm
     const pdfHeight = pdf.internal.pageSize.getHeight();    // 297mm
+
+    // 로고를 위한 하단 여백 확보 (25mm)
+    const footerHeight = 25;
+    const contentMaxHeight = pdfHeight - footerHeight;
+
     const imgWidth = pdfWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    if (imgHeight <= pdfHeight) {
-      // 한 페이지에 모두 들어감
+    if (imgHeight <= contentMaxHeight) {
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
     } else {
-      // 높이 비율에 맞춰 축소하여 한 페이지에 맞춤
-      const scale = pdfHeight / imgHeight;
+      // 내용이 로고 영역까지 침범하면 스케일 축소
+      const scale = contentMaxHeight / imgHeight;
       const fitWidth = imgWidth * scale;
-      const fitHeight = pdfHeight;
+      const fitHeight = contentMaxHeight;
       const xOffset = (pdfWidth - fitWidth) / 2;
       pdf.addImage(imgData, 'PNG', xOffset, 0, fitWidth, fitHeight);
+    }
+
+    // 로고를 페이지 맨 밑 정중앙에 직접 삽입
+    const logoImg: HTMLImageElement = document.createElement('img');
+    logoImg.crossOrigin = 'anonymous';
+    await new Promise((resolve) => {
+      logoImg.onload = resolve;
+      logoImg.onerror = resolve;
+      logoImg.src = '/logo.png';
+    });
+    if (logoImg.complete && logoImg.naturalWidth > 0) {
+      const logoHeightMm = 15;
+      const logoWidthMm = (logoImg.naturalWidth / logoImg.naturalHeight) * logoHeightMm;
+      const logoX = (pdfWidth - logoWidthMm) / 2;
+      const logoY = pdfHeight - logoHeightMm - 5;
+      pdf.addImage(logoImg, 'PNG', logoX, logoY, logoWidthMm, logoHeightMm);
     }
 
     pdf.save(`${employee.name}_인사기록카드.pdf`);
