@@ -367,12 +367,12 @@ export default function EmployeeDetailPage() {
       return `${years}년`;
     })();
 
-    // 테이블 스타일 통일
-    const cellStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;color:#1e293b;';
-    const labelStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;background:#e0e7ff;color:#1e293b;font-weight:600;width:80px;';
-    const sectionHeaderStyle = 'padding:7px 10px;border:1px solid #cbd5e1;font-size:11px;background:#e0e7ff;color:#1e40af;font-weight:700;';
-    const thStyle = 'padding:6px 10px;border:1px solid #cbd5e1;font-size:11px;background:#f1f5f9;color:#334155;font-weight:600;text-align:center;';
-    const tdStyle = 'padding:6px 10px;border:1px solid #cbd5e1;font-size:11px;color:#1e293b;';
+    // 테이블 스타일 통일 (A4 폭에 맞게 크기 축소)
+    const cellStyle = 'padding:6px 8px;border:1px solid #cbd5e1;font-size:10px;color:#1e293b;word-break:break-all;';
+    const labelStyle = 'padding:6px 8px;border:1px solid #cbd5e1;font-size:10px;background:#e0e7ff;color:#1e293b;font-weight:600;text-align:center;white-space:nowrap;';
+    const sectionHeaderStyle = 'padding:6px 10px;border:1px solid #cbd5e1;font-size:11px;background:#e0e7ff;color:#1e40af;font-weight:700;';
+    const thStyle = 'padding:5px 8px;border:1px solid #cbd5e1;font-size:10px;background:#f1f5f9;color:#334155;font-weight:600;text-align:center;white-space:nowrap;';
+    const tdStyle = 'padding:5px 8px;border:1px solid #cbd5e1;font-size:10px;color:#1e293b;word-break:break-all;';
     const tdCenterStyle = tdStyle + 'text-align:center;';
 
     // 경력사항
@@ -412,9 +412,10 @@ export default function EmployeeDetailPage() {
       ? `<img src="${employee.profileImage}" style="width:100%;height:100%;object-fit:cover;" crossorigin="anonymous" />`
       : `<div style="width:100%;height:100%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:11px;">사진</div>`;
 
-    // PDF 전용 숨겨진 HTML 생성
+    // PDF 전용 숨겨진 HTML 생성 (A4: 210mm × 297mm, 96dpi 기준 794×1123px)
+    // 여백 30px씩 → 본문 영역 734px
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;background:#fff;padding:40px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
+    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:794px;box-sizing:border-box;background:#fff;padding:30px;font-family:system-ui,-apple-system,"Malgun Gothic","맑은 고딕",sans-serif;color:#1e293b;';
 
     container.innerHTML = `
       <!-- 제목 -->
@@ -423,15 +424,24 @@ export default function EmployeeDetailPage() {
       </div>
 
       <!-- 기본정보 (사진 + 인적사항) -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
+        <colgroup>
+          <col style="width:100px;" />
+          <col style="width:70px;" />
+          <col style="width:170px;" />
+          <col style="width:55px;" />
+          <col style="width:105px;" />
+          <col style="width:65px;" />
+          <col />
+        </colgroup>
         <tr>
-          <td rowspan="5" style="border:1px solid #cbd5e1;width:110px;height:160px;padding:0;text-align:center;vertical-align:middle;">
+          <td rowspan="5" style="border:1px solid #cbd5e1;height:150px;padding:0;text-align:center;vertical-align:middle;overflow:hidden;">
             ${photoHtml}
           </td>
           <td style="${labelStyle}">성명</td>
-          <td style="${cellStyle}width:220px;">${employee.name} ${age}</td>
+          <td style="${cellStyle}">${employee.name} ${age}</td>
           <td style="${labelStyle}">사번</td>
-          <td style="${cellStyle}width:140px;">${employee.employeeNumber}</td>
+          <td style="${cellStyle}">${employee.employeeNumber}</td>
           <td style="${labelStyle}">부서</td>
           <td style="${cellStyle}">${employee.department}</td>
         </tr>
@@ -464,41 +474,58 @@ export default function EmployeeDetailPage() {
       </table>
 
       <!-- 학력 -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
+        <colgroup>
+          <col style="width:70px;" />
+          <col style="width:170px;" />
+          <col style="width:55px;" />
+          <col />
+        </colgroup>
         <tr><td colspan="4" style="${sectionHeaderStyle}">학력</td></tr>
         <tr>
           <td style="${labelStyle}">최종학력</td>
-          <td style="${cellStyle}width:200px;">${employee.educationLevel || '-'}</td>
+          <td style="${cellStyle}">${employee.educationLevel || '-'}</td>
           <td style="${labelStyle}">학교</td>
           <td style="${cellStyle}">${employee.schoolName || '-'}${employee.major ? ' / ' + employee.major : ''}</td>
         </tr>
       </table>
 
       <!-- 경력사항 -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
+        <colgroup>
+          <col style="width:170px;" />
+          <col style="width:100px;" />
+          <col style="width:170px;" />
+          <col />
+        </colgroup>
         <tr><td colspan="4" style="${sectionHeaderStyle}">경력사항 (${careers.length}건)</td></tr>
         <tr>
           <th style="${thStyle}">회사명</th>
-          <th style="${thStyle}width:120px;">직위</th>
-          <th style="${thStyle}width:200px;">근무기간</th>
+          <th style="${thStyle}">직위</th>
+          <th style="${thStyle}">근무기간</th>
           <th style="${thStyle}">주요업무</th>
         </tr>
         ${careerRows}
       </table>
 
       <!-- 자격증 -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
+        <colgroup>
+          <col />
+          <col style="width:220px;" />
+          <col style="width:100px;" />
+        </colgroup>
         <tr><td colspan="3" style="${sectionHeaderStyle}">자격증 (${empCerts.length}건)</td></tr>
         <tr>
           <th style="${thStyle}">자격증명</th>
           <th style="${thStyle}">발급기관</th>
-          <th style="${thStyle}width:120px;">취득일</th>
+          <th style="${thStyle}">취득일</th>
         </tr>
         ${certRows}
       </table>
 
       <!-- 인사평가 (최근 5건) -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
         <tr><td colspan="3" style="${sectionHeaderStyle}">인사평가 (최근 5건)</td></tr>
         <tr>
           <th style="${thStyle}">연도</th>
@@ -509,11 +536,16 @@ export default function EmployeeDetailPage() {
       </table>
 
       <!-- 인사이력 (최근 10건) -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:30px;table-layout:fixed;">
+        <colgroup>
+          <col style="width:100px;" />
+          <col style="width:90px;" />
+          <col />
+        </colgroup>
         <tr><td colspan="3" style="${sectionHeaderStyle}">인사이력 (최근 10건)</td></tr>
         <tr>
-          <th style="${thStyle}width:120px;">일자</th>
-          <th style="${thStyle}width:100px;">구분</th>
+          <th style="${thStyle}">일자</th>
+          <th style="${thStyle}">구분</th>
           <th style="${thStyle}">내용</th>
         </tr>
         ${historyRows}
@@ -544,14 +576,21 @@ export default function EmployeeDetailPage() {
 
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfWidth = pdf.internal.pageSize.getWidth();      // 210mm
+    const pdfHeight = pdf.internal.pageSize.getHeight();    // 297mm
+    const imgWidth = pdfWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const totalPages = Math.ceil(pdfHeight / pageHeight);
-    for (let i = 0; i < totalPages; i++) {
-      if (i > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -(i * pageHeight), pdfWidth, pdfHeight);
+    if (imgHeight <= pdfHeight) {
+      // 한 페이지에 모두 들어감
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    } else {
+      // 높이 비율에 맞춰 축소하여 한 페이지에 맞춤
+      const scale = pdfHeight / imgHeight;
+      const fitWidth = imgWidth * scale;
+      const fitHeight = pdfHeight;
+      const xOffset = (pdfWidth - fitWidth) / 2;
+      pdf.addImage(imgData, 'PNG', xOffset, 0, fitWidth, fitHeight);
     }
 
     pdf.save(`${employee.name}_인사기록카드.pdf`);
