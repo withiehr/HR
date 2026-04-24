@@ -552,8 +552,8 @@ export default function EmployeeDetailPage() {
       </table>
 
       <!-- 푸터 -->
-      <div style="text-align:center;margin-top:40px;">
-        <img src="/logo.png" style="height:45px;vertical-align:middle;" crossorigin="anonymous" />
+      <div style="width:100%;margin-top:40px;display:flex;justify-content:center;align-items:center;">
+        <img src="/logo.png" style="height:45px;display:block;" crossorigin="anonymous" />
       </div>
     `;
 
